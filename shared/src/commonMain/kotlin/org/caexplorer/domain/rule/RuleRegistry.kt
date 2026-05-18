@@ -37,6 +37,21 @@ object RuleRegistry {
         register(DiffusionLimitedAggregation())
         register(IsingModel())
         register(RockPaperScissors())
+
+        // Additional rules
+        register(LangtonsAnt())
+        register(ContinuousCA.DEFAULT)
+        register(ContinuousCA.CLASS_IV)
+        register(ContinuousCA.CHAOTIC)
+        register(RealSpirals())
+        register(Spirals())
+        register(MajorityVote(numStates = 2))
+        register(MajorityVote(numStates = 3))
+        register(NeuralNetCA())
+        register(GrowingSeed())
+        register(LavaLamp())
+        register(Anneal())
+        register(MazeRule())
     }
 
     fun register(rule: Rule) {
