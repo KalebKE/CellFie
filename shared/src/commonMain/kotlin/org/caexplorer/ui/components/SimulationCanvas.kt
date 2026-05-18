@@ -11,6 +11,8 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
@@ -97,6 +99,13 @@ fun SimulationCanvas(
             .fillMaxSize()
             .shadow(2.dp)
             .border(1.dp, Color(0x20000000))
+            .semantics {
+                contentDescription = if (drawMode) {
+                    "Cellular automaton canvas in draw mode. Click or drag to paint cells."
+                } else {
+                    "Cellular automaton simulation canvas. $gridWidth by $gridHeight cells. Pinch to zoom, drag to pan."
+                }
+            }
             .pointerInput(drawMode) {
                 if (drawMode) {
                     // Draw mode: click/drag paints cells
