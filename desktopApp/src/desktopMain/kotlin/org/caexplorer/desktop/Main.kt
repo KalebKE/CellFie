@@ -17,6 +17,10 @@ fun main() = application {
         MenuBar {
             Menu("File") {
                 Item("New Simulation", onClick = { AppActions.requestReset() })
+                Separator()
+                Item("Save State...", onClick = { AppActions.requestSave() })
+                Item("Load State...", onClick = { AppActions.requestLoad() })
+                Separator()
                 Item("Export Image...", onClick = { AppActions.requestExportImage() })
                 Separator()
                 Item("Record GIF...", onClick = { AppActions.requestStartGif() })
@@ -24,14 +28,24 @@ fun main() = application {
                 Separator()
                 Item("Exit", onClick = ::exitApplication)
             }
+            Menu("Simulation") {
+                Item("Play/Pause", onClick = { AppActions.requestTogglePlayPause() })
+                Item("Step", onClick = { AppActions.requestStep() })
+                Item("Rewind", onClick = { AppActions.requestRewind() })
+                Separator()
+                Item("Reset", onClick = { AppActions.requestReset() })
+            }
             Menu("View") {
                 Item("Toggle Grid", onClick = { AppActions.requestToggleGrid() })
-                Item("Zoom In", onClick = {})
-                Item("Zoom Out", onClick = {})
-                Item("Reset Zoom", onClick = {})
+                Item("Toggle Analysis", onClick = { AppActions.requestToggleAnalysis() })
+                Item("Toggle Draw Mode", onClick = { AppActions.requestToggleDrawMode() })
+                Separator()
+                Item("Fit to Window", onClick = { AppActions.requestFitToWindow() })
             }
             Menu("Help") {
-                Item("About CA Explorer", onClick = {})
+                Item("Keyboard Shortcuts", onClick = { AppActions.requestKeyboardHelp() })
+                Separator()
+                Item("About CA Explorer", onClick = { AppActions.requestAbout() })
             }
         }
         App()

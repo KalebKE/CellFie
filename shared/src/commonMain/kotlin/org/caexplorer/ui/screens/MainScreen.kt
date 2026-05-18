@@ -18,6 +18,9 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isCtrlPressed
+import androidx.compose.ui.input.key.isMetaPressed
+import androidx.compose.ui.input.key.isShiftPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.key.onPreviewKeyEvent
@@ -28,6 +31,9 @@ import org.caexplorer.analysis.AnalysisRegistry
 import org.caexplorer.analysis.AnalysisResult
 import org.caexplorer.data.AppSettings
 import org.caexplorer.data.SettingsKeys
+import org.caexplorer.data.SimulationFileData
+import org.caexplorer.data.loadSimulationFile
+import org.caexplorer.data.saveSimulationFile
 import org.caexplorer.domain.cell.Cell
 import org.caexplorer.domain.cellstate.IntegerCellState
 import org.caexplorer.domain.cellstate.RealValuedState
@@ -37,13 +43,16 @@ import org.caexplorer.domain.lattice.createLattice
 import org.caexplorer.domain.rule.*
 import org.caexplorer.engine.*
 import org.caexplorer.ui.AppActions
+import org.caexplorer.ui.components.AboutDialog
 import org.caexplorer.ui.components.AnalysisDashboard
 import org.caexplorer.ui.components.ConfigPanel
+import org.caexplorer.ui.components.KeyboardShortcutsSheet
 import org.caexplorer.ui.components.RulePickerSheet
 import org.caexplorer.ui.components.SimulationCanvas
 import org.caexplorer.ui.theme.ThemeState
 import org.caexplorer.ui.util.exportImage
 import org.caexplorer.ui.util.GifRecorder
+import kotlin.math.min
 import kotlin.random.Random
 
 /**
@@ -54,7 +63,13 @@ enum class InitPattern(val displayName: String) {
     RANDOM_25("Random 25%"),
     RANDOM_50("Random 50%"),
     CENTER_SEED("Center Seed"),
-    GRADIENT("Gradient")
+    GRADIENT("Gradient"),
+    CHECKERBOARD("Checkerboard"),
+    DISK("Disk"),
+    RING("Ring"),
+    RANDOM_SYMMETRIC("Symmetric Random"),
+    CROSS("Cross"),
+    DIAGONAL("Diagonal Stripes")
 }
 
 /**
@@ -95,6 +110,9 @@ fun MainScreen() {
         mutableStateOf(AppSettings.getInt(SettingsKeys.LAST_RULE_INDEX, 0).coerceIn(0, RuleRegistry.getFeaturedRules().lastIndex))
     }
 
+    // Current rule instance (may differ from rules[selectedRuleIndex] if properties were changed)
+    var currentRule by remember { mutableStateOf<Rule?>(null) }
+
     // Init pattern
     var initPattern by remember { mutableStateOf(InitPattern.AUTO) }
 
@@ -122,6 +140,10 @@ fun MainScreen() {
     var gifRecording by remember { mutableStateOf(false) }
     var gifFrameCount by remember { mutableStateOf(0) }
     val maxGifFrames = 500
+
+    // Dialog states
+    var showAbout by remember { mutableStateOf(false) }
+    var showKeyboardHelp by remember { mutableStateOf(false) }
 
     // Canvas fade animation for rule switches
     var canvasFadeTrigger by remember { mutableStateOf(0) }
@@ -217,7 +239,7 @@ fun MainScreen() {
 
     // Initialize simulation on rule/grid/reset/lattice changes
     LaunchedEffect(selectedRuleIndex, gridWidth, gridHeight, resetKey, selectedLatticeType) {
-        val rule = rules.getOrNull(selectedRuleIndex) ?: return@LaunchedEffect
+        val rule = currentRule ?: rules.getOrNull(selectedRuleIndex) ?: return@LaunchedEffect
         val numStates = (rule as? IntegerRule)?.numStates ?: 2
         IntegerCellState.numStates = numStates
 
@@ -233,12 +255,31 @@ fun MainScreen() {
             InitPattern.RANDOM_50 -> 0.50
             InitPattern.CENTER_SEED -> 0.0
             InitPattern.GRADIENT -> 0.0
+            InitPattern.CHECKERBOARD -> 0.0
+            InitPattern.DISK -> 0.0
+            InitPattern.RING -> 0.0
+            InitPattern.RANDOM_SYMMETRIC -> 0.50
+            InitPattern.CROSS -> 0.0
+            InitPattern.DIAGONAL -> 0.0
         }
 
         val useCenter = initPattern == InitPattern.CENTER_SEED
         val useGradient = initPattern == InitPattern.GRADIENT
         val isRealRule = rule is RealRule
         val useRandomReals = isRealRule && !useGradient
+
+        // Pre-generate quadrant for RANDOM_SYMMETRIC
+        val symmetricQuadrant = if (initPattern == InitPattern.RANDOM_SYMMETRIC && !isRealRule) {
+            val halfW = (gridWidth + 1) / 2
+            val halfH = (gridHeight + 1) / 2
+            Array(halfH) { row ->
+                IntArray(halfW) { col ->
+                    if (Random.nextDouble() < density) {
+                        if (numStates > 2) Random.nextInt(1, numStates) else 1
+                    } else 0
+                }
+            }
+        } else null
 
         val lattice = createLattice(selectedLatticeType, gridWidth, gridHeight) { coord ->
             when {
@@ -254,6 +295,40 @@ fun MainScreen() {
                 }
                 useGradient -> {
                     val state = ((coord.col.toDouble() / gridWidth) * (numStates - 1)).toInt()
+                    Cell(IntegerCellState(state), coord)
+                }
+                initPattern == InitPattern.CHECKERBOARD -> {
+                    val state = if ((coord.row + coord.col) % 2 == 0) numStates - 1 else 0
+                    Cell(IntegerCellState(state), coord)
+                }
+                initPattern == InitPattern.DISK -> {
+                    val dx = coord.col - gridWidth / 2
+                    val dy = coord.row - gridHeight / 2
+                    val r = min(gridWidth, gridHeight) / 4
+                    val state = if (dx * dx + dy * dy <= r * r) numStates - 1 else 0
+                    Cell(IntegerCellState(state), coord)
+                }
+                initPattern == InitPattern.RING -> {
+                    val dx = coord.col - gridWidth / 2
+                    val dy = coord.row - gridHeight / 2
+                    val r = min(gridWidth, gridHeight) / 4
+                    val distSq = dx * dx + dy * dy
+                    val innerR = (r * 0.6).toInt()
+                    val state = if (distSq <= r * r && distSq > innerR * innerR) numStates - 1 else 0
+                    Cell(IntegerCellState(state), coord)
+                }
+                initPattern == InitPattern.RANDOM_SYMMETRIC && symmetricQuadrant != null -> {
+                    val mirrorRow = if (coord.row < gridHeight / 2) coord.row else gridHeight - 1 - coord.row
+                    val mirrorCol = if (coord.col < gridWidth / 2) coord.col else gridWidth - 1 - coord.col
+                    val state = symmetricQuadrant[mirrorRow.coerceIn(0, symmetricQuadrant.size - 1)][mirrorCol.coerceIn(0, symmetricQuadrant[0].size - 1)]
+                    Cell(IntegerCellState(state), coord)
+                }
+                initPattern == InitPattern.CROSS -> {
+                    val state = if (coord.row == gridHeight / 2 || coord.col == gridWidth / 2) numStates - 1 else 0
+                    Cell(IntegerCellState(state), coord)
+                }
+                initPattern == InitPattern.DIAGONAL -> {
+                    val state = if ((coord.row + coord.col) % 6 < 3) numStates - 1 else 0
                     Cell(IntegerCellState(state), coord)
                 }
                 else -> {
@@ -311,6 +386,88 @@ fun MainScreen() {
         }
     }
 
+    // Wire new menu bar actions
+    val externalStep = AppActions.stepTrigger
+    LaunchedEffect(externalStep) {
+        if (externalStep > 0) engine.step()
+    }
+    val externalRewind = AppActions.rewindTrigger
+    LaunchedEffect(externalRewind) {
+        if (externalRewind > 0) engine.rewind()
+    }
+    val externalToggleAnalysis = AppActions.toggleAnalysisTrigger
+    LaunchedEffect(externalToggleAnalysis) {
+        if (externalToggleAnalysis > 0) showAnalysis = !showAnalysis
+    }
+    val externalFitToWindow = AppActions.fitToWindowTrigger
+    LaunchedEffect(externalFitToWindow) {
+        if (externalFitToWindow > 0) fitToWindowTrigger++
+    }
+    val externalAbout = AppActions.aboutTrigger
+    LaunchedEffect(externalAbout) {
+        if (externalAbout > 0) showAbout = true
+    }
+    val externalKeyboardHelp = AppActions.keyboardHelpTrigger
+    LaunchedEffect(externalKeyboardHelp) {
+        if (externalKeyboardHelp > 0) showKeyboardHelp = true
+    }
+
+    // Wire save/load triggers
+    val externalSave = AppActions.saveTrigger
+    LaunchedEffect(externalSave) {
+        if (externalSave > 0) {
+            val config = engine.config ?: return@LaunchedEffect
+            val lattice = config.lattice
+            val cellStates = IntArray(lattice.cellCount) { i -> lattice.getCell(i).toInt() }
+            val fileData = SimulationFileData(
+                ruleName = config.rule.displayName,
+                latticeType = selectedLatticeType.name,
+                width = gridWidth,
+                height = gridHeight,
+                cellStates = cellStates,
+                colorSchemeIndex = selectedColorSchemeIndex,
+                generation = simState.generation
+            )
+            withContext(Dispatchers.Default) {
+                saveSimulationFile(fileData)
+            }
+        }
+    }
+    val externalLoad = AppActions.loadTrigger
+    LaunchedEffect(externalLoad) {
+        if (externalLoad > 0) {
+            val fileData = withContext(Dispatchers.Default) { loadSimulationFile() }
+            if (fileData != null) {
+                // Find matching rule by name
+                val ruleIdx = rules.indexOfFirst { it.displayName == fileData.ruleName }
+                if (ruleIdx >= 0) {
+                    val latticeType = try { LatticeType.valueOf(fileData.latticeType) } catch (_: Exception) { null }
+                    if (latticeType != null) {
+                        selectedLatticeType = latticeType
+                    }
+                    gridWidth = fileData.width
+                    gridHeight = fileData.height
+                    selectedColorSchemeIndex = fileData.colorSchemeIndex.coerceIn(0, colorSchemes.lastIndex)
+                    selectedRuleIndex = ruleIdx
+
+                    // Wait for the LaunchedEffect above to reinitialize, then overwrite cell states
+                    kotlinx.coroutines.delay(100)
+                    val config = engine.config
+                    if (config != null) {
+                        val lattice = config.lattice
+                        for (i in fileData.cellStates.indices) {
+                            if (i < lattice.cellCount) {
+                                lattice.getCell(i).resetState(IntegerCellState(fileData.cellStates[i]))
+                            }
+                        }
+                        // Refresh the color buffer
+                        engine.updateColorScheme(colorSchemes[selectedColorSchemeIndex])
+                    }
+                }
+            }
+        }
+    }
+
     // Cleanup
     DisposableEffect(Unit) {
         onDispose { engine.destroy() }
@@ -350,6 +507,16 @@ fun MainScreen() {
         }
     }
 
+    // Wire menu bar actions that depend on local functions
+    val externalTogglePlayPause = AppActions.togglePlayPauseTrigger
+    LaunchedEffect(externalTogglePlayPause) {
+        if (externalTogglePlayPause > 0) togglePlayPause()
+    }
+    val externalToggleDrawMode = AppActions.toggleDrawModeTrigger
+    LaunchedEffect(externalToggleDrawMode) {
+        if (externalToggleDrawMode > 0) toggleDrawMode()
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -377,6 +544,11 @@ fun MainScreen() {
                             if (speedIndex < speedSteps.lastIndex) speedIndex++
                             true
                         }
+                        Key.Slash -> {
+                            if (event.isShiftPressed) { showKeyboardHelp = true; true }
+                            else false
+                        }
+                        Key.F1 -> { showKeyboardHelp = true; true }
                         else -> false
                     }
                 } else false
@@ -679,6 +851,11 @@ fun MainScreen() {
                                 onInitPatternChanged = { initPattern = it },
                                 selectedLatticeType = selectedLatticeType,
                                 onLatticeTypeChanged = { selectedLatticeType = it },
+                                currentRule = currentRule,
+                                onRuleChanged = { newRule ->
+                                    currentRule = newRule
+                                    resetKey++
+                                },
                                 onResetSimulation = { engine.stop(); resetKey++ },
                                 onDismiss = { showConfig = false }
                             )
@@ -697,6 +874,16 @@ fun MainScreen() {
                     },
                     onDismiss = { showRulePicker = false }
                 )
+            }
+
+            // About dialog
+            if (showAbout) {
+                AboutDialog(onDismiss = { showAbout = false })
+            }
+
+            // Keyboard shortcuts help dialog
+            if (showKeyboardHelp) {
+                KeyboardShortcutsSheet(onDismiss = { showKeyboardHelp = false })
             }
         }
     }
