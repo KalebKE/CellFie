@@ -63,6 +63,11 @@ class SimulationEngine {
     /** The current RGB color for each cell, updated every N generations. */
     val cellColors: StateFlow<IntArray> = _cellColors.asStateFlow()
 
+    private val _delayMs = MutableStateFlow(0L)
+
+    @Volatile
+    private var activeColorScheme: ColorScheme? = null
+
     private var simulationJob: Job? = null
     private var config: SimulationConfig? = null
 
@@ -74,6 +79,7 @@ class SimulationEngine {
     fun configure(config: SimulationConfig) {
         stop()
         this.config = config
+        activeColorScheme = config.colorScheme
         _state.value = SimulationState(status = SimulationStatus.IDLE, generation = 0)
         updateColorBuffer(config)
     }
@@ -164,6 +170,33 @@ class SimulationEngine {
         scope.cancel()
     }
 
+    /**
+     * Set the simulation speed delay in milliseconds.
+     * 0 = maximum speed, higher = slower.
+     */
+    fun setSpeed(delayMs: Long) {
+        _delayMs.value = delayMs.coerceAtLeast(0)
+    }
+
+    /**
+     * Update the color scheme used for rendering without reinitializing.
+     */
+    fun updateColorScheme(scheme: ColorScheme) {
+        activeColorScheme = scheme
+        val cfg = config ?: return
+        this.config = cfg.copy(colorScheme = scheme)
+        updateColorBuffer(cfg)
+    }
+
+    /**
+     * Reset the engine state (stop + clear generation counter).
+     * Re-initialization of cells is handled by the caller.
+     */
+    fun reset() {
+        stop()
+        _state.value = SimulationState(status = SimulationStatus.IDLE, generation = 0)
+    }
+
     // --- Internal simulation loop ---
 
     private suspend fun runSimulation(cfg: SimulationConfig) {
@@ -176,6 +209,10 @@ class SimulationEngine {
             incrementGeneration(cfg)
             genCount++
             gensSinceLastMeasure++
+
+            // Speed control delay
+            val speedDelay = _delayMs.value
+            if (speedDelay > 0) delay(speedDelay)
 
             // Update graphics every N steps
             if (genCount % cfg.updateGraphicsEveryNSteps == 0L) {
@@ -249,7 +286,7 @@ class SimulationEngine {
      */
     private fun updateColorBuffer(cfg: SimulationConfig) {
         val cells = cfg.lattice.cells
-        val scheme = cfg.colorScheme
+        val scheme = activeColorScheme ?: cfg.colorScheme
         val numStates = (cfg.rule as? org.caexplorer.domain.rule.IntegerRule)?.numStates ?: 2
 
         val colors = IntArray(cells.size) { i ->

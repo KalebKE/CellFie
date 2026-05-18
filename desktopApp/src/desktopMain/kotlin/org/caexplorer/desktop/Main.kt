@@ -6,6 +6,7 @@ import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import org.caexplorer.ui.App
+import org.caexplorer.ui.AppActions
 
 fun main() = application {
     Window(
@@ -15,12 +16,12 @@ fun main() = application {
     ) {
         MenuBar {
             Menu("File") {
-                Item("New Simulation", onClick = {})
+                Item("New Simulation", onClick = { AppActions.requestReset() })
                 Separator()
                 Item("Exit", onClick = ::exitApplication)
             }
             Menu("View") {
-                Item("Toggle Grid", onClick = {})
+                Item("Toggle Grid", onClick = { AppActions.requestToggleGrid() })
                 Item("Zoom In", onClick = {})
                 Item("Zoom Out", onClick = {})
                 Item("Reset Zoom", onClick = {})

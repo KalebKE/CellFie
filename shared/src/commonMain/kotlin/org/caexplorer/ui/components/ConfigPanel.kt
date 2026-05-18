@@ -2,17 +2,21 @@ package org.caexplorer.ui.components
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.RestartAlt
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import org.caexplorer.domain.colorscheme.ColorScheme as CAColorScheme
+import org.caexplorer.ui.screens.InitPattern
 import kotlin.math.roundToInt
 
 /**
- * Configuration panel for simulation settings.
- * Displayed as a side sheet or bottom sheet depending on layout.
+ * Configuration panel for simulation settings including grid size,
+ * color scheme, speed control, and initialization pattern.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -20,6 +24,16 @@ fun ConfigPanel(
     gridWidth: Int,
     gridHeight: Int,
     onGridSizeChanged: (width: Int, height: Int) -> Unit,
+    colorSchemes: List<CAColorScheme>,
+    selectedColorSchemeIndex: Int,
+    onColorSchemeChanged: (Int) -> Unit,
+    simulationDelay: Long,
+    speedSteps: List<Long>,
+    speedIndex: Int,
+    onSpeedIndexChanged: (Int) -> Unit,
+    initPattern: InitPattern,
+    onInitPatternChanged: (InitPattern) -> Unit,
+    onResetSimulation: () -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -27,7 +41,7 @@ fun ConfigPanel(
     var heightSlider by remember(gridHeight) { mutableStateOf(gridHeight.toFloat()) }
 
     Card(
-        modifier = modifier.width(280.dp),
+        modifier = modifier.width(300.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
         ),
@@ -35,7 +49,7 @@ fun ConfigPanel(
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             // Header
             Row(
@@ -54,10 +68,112 @@ fun ConfigPanel(
 
             HorizontalDivider()
 
-            // Grid width
+            // --- Color Scheme ---
             Text(
-                "Grid Width: ${widthSlider.roundToInt()}",
-                style = MaterialTheme.typography.labelMedium
+                "Color Scheme",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.primary
+            )
+            Box {
+                var csExpanded by remember { mutableStateOf(false) }
+                OutlinedButton(
+                    onClick = { csExpanded = true },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        colorSchemes.getOrNull(selectedColorSchemeIndex)?.displayName ?: "Rainbow",
+                        modifier = Modifier.weight(1f)
+                    )
+                    Icon(Icons.Default.ArrowDropDown, null)
+                }
+                DropdownMenu(
+                    expanded = csExpanded,
+                    onDismissRequest = { csExpanded = false }
+                ) {
+                    colorSchemes.forEachIndexed { index, scheme ->
+                        DropdownMenuItem(
+                            text = { Text(scheme.displayName) },
+                            onClick = {
+                                onColorSchemeChanged(index)
+                                csExpanded = false
+                            }
+                        )
+                    }
+                }
+            }
+
+            HorizontalDivider()
+
+            // --- Speed Control ---
+            Text(
+                "Speed",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.primary
+            )
+            Text(
+                if (simulationDelay == 0L) "Max Speed" else "Delay: ${simulationDelay}ms",
+                style = MaterialTheme.typography.bodySmall
+            )
+            Slider(
+                value = speedIndex.toFloat(),
+                onValueChange = { onSpeedIndexChanged(it.roundToInt()) },
+                valueRange = 0f..(speedSteps.size - 1).toFloat(),
+                steps = speedSteps.size - 2
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text("⚡ Fast", style = MaterialTheme.typography.labelSmall)
+                Text("🐌 Slow", style = MaterialTheme.typography.labelSmall)
+            }
+
+            HorizontalDivider()
+
+            // --- Initialization Pattern ---
+            Text(
+                "Init Pattern",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.primary
+            )
+            Box {
+                var ipExpanded by remember { mutableStateOf(false) }
+                OutlinedButton(
+                    onClick = { ipExpanded = true },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(initPattern.displayName, modifier = Modifier.weight(1f))
+                    Icon(Icons.Default.ArrowDropDown, null)
+                }
+                DropdownMenu(
+                    expanded = ipExpanded,
+                    onDismissRequest = { ipExpanded = false }
+                ) {
+                    InitPattern.entries.forEach { pattern ->
+                        DropdownMenuItem(
+                            text = { Text(pattern.displayName) },
+                            onClick = {
+                                onInitPatternChanged(pattern)
+                                ipExpanded = false
+                            }
+                        )
+                    }
+                }
+            }
+
+            HorizontalDivider()
+
+            // --- Grid Size ---
+            Text(
+                "Grid Size",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.primary
+            )
+
+            // Width
+            Text(
+                "Width: ${widthSlider.roundToInt()}",
+                style = MaterialTheme.typography.bodySmall
             )
             Slider(
                 value = widthSlider,
@@ -69,10 +185,10 @@ fun ConfigPanel(
                 steps = 18
             )
 
-            // Grid height
+            // Height
             Text(
-                "Grid Height: ${heightSlider.roundToInt()}",
-                style = MaterialTheme.typography.labelMedium
+                "Height: ${heightSlider.roundToInt()}",
+                style = MaterialTheme.typography.bodySmall
             )
             Slider(
                 value = heightSlider,
@@ -84,14 +200,7 @@ fun ConfigPanel(
                 steps = 18
             )
 
-            HorizontalDivider()
-
-            // Preset sizes
-            Text(
-                "Presets",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.primary
-            )
+            // Presets
             Row(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
@@ -116,6 +225,25 @@ fun ConfigPanel(
                     },
                     label = { Text("500²") }
                 )
+            }
+
+            HorizontalDivider()
+
+            // --- Reset Button ---
+            Button(
+                onClick = onResetSimulation,
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.error
+                )
+            ) {
+                Icon(
+                    Icons.Default.RestartAlt,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(Modifier.width(8.dp))
+                Text("Reset Simulation")
             }
         }
     }

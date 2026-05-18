@@ -34,12 +34,21 @@ fun SimulationCanvas(
     gridWidth: Int,
     gridHeight: Int,
     gridVisible: Boolean = false,
+    fitToWindowTrigger: Int = 0,
     modifier: Modifier = Modifier,
     onCellClick: ((col: Int, row: Int) -> Unit)? = null
 ) {
     // Zoom and pan state
     var scale by remember { mutableStateOf(1f) }
     var offset by remember { mutableStateOf(Offset.Zero) }
+
+    // Reset zoom/pan when fitToWindowTrigger changes
+    LaunchedEffect(fitToWindowTrigger) {
+        if (fitToWindowTrigger > 0) {
+            scale = 1f
+            offset = Offset.Zero
+        }
+    }
 
     // Create ImageBitmap from cell colors (only when data changes)
     val bitmap = remember(cellColors, gridWidth, gridHeight) {
