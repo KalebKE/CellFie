@@ -4,6 +4,16 @@ import org.caexplorer.domain.cell.Cell
 import org.caexplorer.domain.cellstate.CellState
 
 /**
+ * Describes a configurable property of a rule.
+ */
+sealed class RuleProperty(val key: String, val label: String, val description: String = "") {
+    class IntProperty(key: String, label: String, val value: Int, val min: Int, val max: Int, description: String = "") : RuleProperty(key, label, description)
+    class FloatProperty(key: String, label: String, val value: Float, val min: Float, val max: Float, description: String = "") : RuleProperty(key, label, description)
+    class BooleanProperty(key: String, label: String, val value: Boolean, description: String = "") : RuleProperty(key, label, description)
+    class ChoiceProperty(key: String, label: String, val value: String, val choices: List<String>, description: String = "") : RuleProperty(key, label, description)
+}
+
+/**
  * Defines a cellular automaton rule — the function that computes
  * the next state of a cell based on its current state and neighbors.
  *
@@ -50,6 +60,12 @@ interface Rule {
      * Tooltip text for the UI.
      */
     val tooltip: String get() = description
+
+    /** Configurable properties for this rule. Empty list means no configuration. */
+    val properties: List<RuleProperty> get() = emptyList()
+
+    /** Update a property value. Returns a new Rule instance with the updated value, or this if unchanged. */
+    fun withProperty(key: String, value: Any): Rule = this
 }
 
 /**

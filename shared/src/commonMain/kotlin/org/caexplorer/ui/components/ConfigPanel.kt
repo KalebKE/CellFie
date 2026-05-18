@@ -15,6 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import org.caexplorer.domain.colorscheme.ColorScheme as CAColorScheme
 import org.caexplorer.domain.lattice.LatticeType
+import org.caexplorer.domain.rule.Rule
 import org.caexplorer.ui.screens.InitPattern
 import kotlin.math.roundToInt
 
@@ -70,6 +71,8 @@ fun ConfigPanel(
     onInitPatternChanged: (InitPattern) -> Unit,
     selectedLatticeType: LatticeType,
     onLatticeTypeChanged: (LatticeType) -> Unit,
+    currentRule: Rule? = null,
+    onRuleChanged: ((Rule) -> Unit)? = null,
     onResetSimulation: () -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier
@@ -82,6 +85,7 @@ fun ConfigPanel(
     var speedExpanded by remember { mutableStateOf(true) }
     var initPatternExpanded by remember { mutableStateOf(true) }
     var gridSizeExpanded by remember { mutableStateOf(true) }
+    var rulePropsExpanded by remember { mutableStateOf(true) }
 
     Column(
         modifier = modifier
@@ -325,6 +329,23 @@ fun ConfigPanel(
         }
 
         HorizontalDivider()
+
+        // --- Rule Properties ---
+        if (currentRule != null && onRuleChanged != null) {
+            SectionHeader("Rule Properties", rulePropsExpanded) { rulePropsExpanded = !rulePropsExpanded }
+            AnimatedVisibility(
+                visible = rulePropsExpanded,
+                enter = expandVertically(),
+                exit = shrinkVertically()
+            ) {
+                RulePropertiesPanel(
+                    rule = currentRule,
+                    onRuleChanged = onRuleChanged
+                )
+            }
+
+            HorizontalDivider()
+        }
 
         // --- Reset Button ---
         Button(

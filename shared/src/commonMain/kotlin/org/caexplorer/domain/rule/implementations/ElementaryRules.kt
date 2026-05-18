@@ -4,7 +4,9 @@ import org.caexplorer.domain.cell.Cell
 import org.caexplorer.domain.cellstate.CellState
 import org.caexplorer.domain.cellstate.IntegerCellState
 import org.caexplorer.domain.rule.IntegerRule
+import org.caexplorer.domain.rule.Rule
 import org.caexplorer.domain.rule.RuleCategory
+import org.caexplorer.domain.rule.RuleProperty
 import org.caexplorer.domain.util.BaseConverter
 
 /**
@@ -36,6 +38,16 @@ class WolframRule(val ruleNumber: Int) : IntegerRule() {
     }
 
     override fun createInitialState(): CellState = IntegerCellState(0)
+
+    override val properties: List<RuleProperty>
+        get() = listOf(
+            RuleProperty.IntProperty("ruleNumber", "Rule Number", ruleNumber, 0, 255, "Wolfram rule number (0-255)")
+        )
+
+    override fun withProperty(key: String, value: Any): Rule = when (key) {
+        "ruleNumber" -> WolframRule((value as Number).toInt().coerceIn(0, 255))
+        else -> this
+    }
 
     companion object {
         val RULE_30 = WolframRule(30)

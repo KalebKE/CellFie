@@ -524,7 +524,15 @@ fun MainScreen() {
             .focusable()
             .onPreviewKeyEvent { event ->
                 if (event.type == KeyEventType.KeyDown) {
-                    when (event.key) {
+                    val isModifier = event.isCtrlPressed || event.isMetaPressed
+                    when {
+                        isModifier && event.key == Key.S -> {
+                            AppActions.requestSave(); true
+                        }
+                        isModifier && event.key == Key.O -> {
+                            AppActions.requestLoad(); true
+                        }
+                        else -> when (event.key) {
                         Key.Spacebar -> { togglePlayPause(); true }
                         Key.S -> { engine.step(); true }
                         Key.R -> { engine.rewind(); true }
@@ -550,6 +558,7 @@ fun MainScreen() {
                         }
                         Key.F1 -> { showKeyboardHelp = true; true }
                         else -> false
+                    }
                     }
                 } else false
             }

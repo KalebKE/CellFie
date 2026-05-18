@@ -4,7 +4,9 @@ import org.caexplorer.domain.cell.Cell
 import org.caexplorer.domain.cellstate.CellState
 import org.caexplorer.domain.cellstate.IntegerCellState
 import org.caexplorer.domain.rule.BinaryRule
+import org.caexplorer.domain.rule.Rule
 import org.caexplorer.domain.rule.RuleCategory
+import org.caexplorer.domain.rule.RuleProperty
 
 /**
  * Conway's Game of Life.
@@ -39,6 +41,33 @@ class Life : BinaryRule() {
     }
 
     override fun createInitialState(): CellState = IntegerCellState(0)
+
+    override val properties: List<RuleProperty>
+        get() = listOf(
+            RuleProperty.ChoiceProperty(
+                "variant", "Variant", "B3/S23",
+                listOf("B3/S23", "B36/S23", "B3/S012345678", "B1357/S1357", "B2/S", "B368/S245"),
+                "Life variant birth/survival rule"
+            )
+        )
+
+    override fun withProperty(key: String, value: Any): Rule = when {
+        key == "variant" -> {
+            val variant = value as String
+            parseLifeVariant(variant) ?: this
+        }
+        else -> this
+    }
+
+    companion object {
+        private fun parseLifeVariant(notation: String): Rule? {
+            if (notation == "B3/S23") return Life()
+            val match = Regex("""B(\d*)/S(\d*)""").matchEntire(notation) ?: return null
+            val birth = match.groupValues[1].map { it.digitToInt() }.toSet()
+            val survival = match.groupValues[2].map { it.digitToInt() }.toSet()
+            return LifeLike(birth, survival, notation)
+        }
+    }
 }
 
 /**
