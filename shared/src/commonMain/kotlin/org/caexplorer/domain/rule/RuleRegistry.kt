@@ -52,6 +52,67 @@ object RuleRegistry {
         register(LavaLamp())
         register(Anneal())
         register(MazeRule())
+
+        // Totalistic rules
+        register(OuterTotalisticRule(
+            ruleNumber = 224, numStates = 2,
+            displayName = "Outer Totalistic",
+            description = "Generic outer totalistic rule using a configurable rule number"
+        ))
+        register(Totalistic2DRule(
+            ruleNumber = 224, numStates = 2,
+            displayName = "Totalistic 2D",
+            description = "Generic 2D totalistic rule including cell value in the sum"
+        ))
+
+        // Visual rules
+        register(Snowflake())
+        register(SnowflakeDust())
+        register(SnowflakeMaze())
+        register(PulsingSnowflake())
+        register(Lightning())
+        register(ThunderStorm())
+        register(Fireworks())
+        register(CollidingCyclones())
+        register(EpilepticBlobs())
+
+        // Fractal rules
+        register(Fractal())
+        register(FractalIteration())
+        register(FractalThreshold())
+        register(MovingFractal())
+
+        // Physics rules
+        register(Q2RIsingModel())
+        register(Nucleation())
+
+        // Sorting rules
+        register(IntegerAverage())
+        register(IntegerSort())
+        register(CopyRandomNeighbor())
+        register(SumModuloN())
+
+        // Life variant rules
+        register(Bunnies())
+        register(CrystalLife())
+        register(DrunkGliders())
+        register(TunnellingSpaceships())
+        register(WaterSkimmers())
+
+        // Exotic rules
+        register(CyclicPulse())
+        register(ElectricLoops())
+        register(SuperLoops())
+        register(GalacticFlashWeb())
+        register(SelfishCA())
+        register(ObesityModel())
+        register(Symmetry())
+
+        // Misc rules
+        register(RandomUpdate())
+        register(LangtonLambda())
+        register(PrimeDeath())
+        register(PrimePlague())
     }
 
     fun register(rule: Rule) {
