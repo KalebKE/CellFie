@@ -1,16 +1,19 @@
 package org.caexplorer.ui.components
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.dp
 import kotlin.math.min
 
 /**
@@ -86,9 +89,14 @@ fun SimulationCanvas(
         return Pair(col, row)
     }
 
+    // Track hover position for crosshair in draw mode
+    var hoverPosition by remember { mutableStateOf<Offset?>(null) }
+
     Canvas(
         modifier = modifier
             .fillMaxSize()
+            .shadow(2.dp)
+            .border(1.dp, Color(0x20000000))
             .pointerInput(drawMode) {
                 if (drawMode) {
                     // Draw mode: click/drag paints cells
@@ -96,6 +104,7 @@ fun SimulationCanvas(
                     detectDragGestures(
                         onDragStart = { startPos ->
                             lastPaintedCell = null
+                            hoverPosition = startPos
                             val cell = screenToCell(startPos)
                             if (cell != null) {
                                 onCellToggle?.invoke(cell.first, cell.second)
@@ -104,6 +113,7 @@ fun SimulationCanvas(
                         },
                         onDrag = { change, _ ->
                             change.consume()
+                            hoverPosition = change.position
                             val cell = screenToCell(change.position)
                             if (cell != null && cell != lastPaintedCell) {
                                 onCellPaint?.invoke(cell.first, cell.second)
@@ -112,11 +122,9 @@ fun SimulationCanvas(
                         },
                         onDragEnd = {
                             lastPaintedCell = null
-                            onPaintFinished?.invoke()
                         },
                         onDragCancel = {
                             lastPaintedCell = null
-                            onPaintFinished?.invoke()
                         }
                     )
                 } else {
@@ -185,6 +193,24 @@ fun SimulationCanvas(
                     strokeWidth = 1f
                 )
             }
+        }
+        // Draw crosshair cursor in draw mode
+        if (drawMode && hoverPosition != null) {
+            val pos = hoverPosition!!
+            val crosshairColor = Color(0x80FFFFFF)
+            val crosshairSize = 12f
+            drawLine(
+                color = crosshairColor,
+                start = Offset(pos.x - crosshairSize, pos.y),
+                end = Offset(pos.x + crosshairSize, pos.y),
+                strokeWidth = 1.5f
+            )
+            drawLine(
+                color = crosshairColor,
+                start = Offset(pos.x, pos.y - crosshairSize),
+                end = Offset(pos.x, pos.y + crosshairSize),
+                strokeWidth = 1.5f
+            )
         }
     }
 }
