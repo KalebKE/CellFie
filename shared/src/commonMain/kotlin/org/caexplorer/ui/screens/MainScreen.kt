@@ -5,7 +5,6 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -49,7 +48,6 @@ import org.caexplorer.ui.components.ConfigPanel
 import org.caexplorer.ui.components.KeyboardShortcutsSheet
 import org.caexplorer.ui.components.RulePickerSheet
 import org.caexplorer.ui.components.SimulationCanvas
-import org.caexplorer.ui.theme.ThemeState
 import org.caexplorer.ui.util.exportImage
 import org.caexplorer.ui.util.GifRecorder
 import kotlin.math.min
@@ -153,17 +151,6 @@ fun MainScreen() {
         label = "canvas-fade"
     )
 
-    // Load dark theme from settings on startup
-    LaunchedEffect(Unit) {
-        val savedDark = AppSettings.getBoolean(SettingsKeys.DARK_THEME, false)
-        if (ThemeState.useDarkTheme == null) {
-            ThemeState.useDarkTheme = savedDark
-        }
-    }
-
-    // Theme
-    val isDark = ThemeState.useDarkTheme ?: isSystemInDarkTheme()
-
     // Propagate speed changes to engine
     LaunchedEffect(simulationDelay) {
         engine.setSpeed(simulationDelay)
@@ -233,10 +220,6 @@ fun MainScreen() {
     LaunchedEffect(selectedLatticeType) {
         AppSettings.putString(SettingsKeys.LATTICE_TYPE, selectedLatticeType.name)
     }
-    LaunchedEffect(isDark) {
-        AppSettings.putBoolean(SettingsKeys.DARK_THEME, isDark)
-    }
-
     // Initialize simulation on rule/grid/reset/lattice changes
     LaunchedEffect(selectedRuleIndex, gridWidth, gridHeight, resetKey, selectedLatticeType) {
         val rule = currentRule ?: rules.getOrNull(selectedRuleIndex) ?: return@LaunchedEffect
@@ -626,17 +609,6 @@ fun MainScreen() {
                                 contentDescription = "Toggle grid (G)",
                                 tint = if (gridVisible) MaterialTheme.colorScheme.primary
                                 else MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-
-                        // Theme toggle
-                        IconButton(onClick = {
-                            ThemeState.useDarkTheme = !isDark
-                        }) {
-                            Icon(
-                                if (isDark) Icons.Default.LightMode
-                                else Icons.Default.DarkMode,
-                                contentDescription = "Toggle theme"
                             )
                         }
 
