@@ -1,6 +1,7 @@
 package org.caexplorer.desktop
 
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.MenuBar
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
@@ -12,6 +13,22 @@ fun main() = application {
         title = "CA Explorer",
         state = rememberWindowState(width = 1280.dp, height = 900.dp)
     ) {
+        MenuBar {
+            Menu("File") {
+                Item("New Simulation", onClick = {})
+                Separator()
+                Item("Exit", onClick = ::exitApplication)
+            }
+            Menu("View") {
+                Item("Toggle Grid", onClick = {})
+                Item("Zoom In", onClick = {})
+                Item("Zoom Out", onClick = {})
+                Item("Reset Zoom", onClick = {})
+            }
+            Menu("Help") {
+                Item("About CA Explorer", onClick = {})
+            }
+        }
         App()
     }
 }
