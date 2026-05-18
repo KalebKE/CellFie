@@ -40,6 +40,8 @@ object AppActions {
         private set
     var keyboardHelpTrigger by mutableStateOf(0)
         private set
+    var helpTrigger by mutableStateOf(0)
+        private set
     // Save/load triggers — may also be wired by save/load feature
     var saveTrigger by mutableStateOf(0)
         private set
@@ -59,6 +61,7 @@ object AppActions {
     fun requestFitToWindow() { fitToWindowTrigger++ }
     fun requestAbout() { aboutTrigger++ }
     fun requestKeyboardHelp() { keyboardHelpTrigger++ }
+    fun requestHelp() { helpTrigger++ }
     fun requestSave() { saveTrigger++ }
     fun requestLoad() { loadTrigger++ }
 }

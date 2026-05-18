@@ -15,6 +15,16 @@ object AnalysisRegistry {
         register(CenterOfMassAnalysis())
         register(MutualInformationAnalysis())
         register(HammingDistanceAnalysis())
+
+        // Dimensional analyses
+        register(BoxCountingDimensionAnalysis())
+        register(CorrelationDimensionAnalysis())
+        register(LargestNeighborhoodAnalysis())
+
+        // Visual analyses
+        register(SliceAnalysis())
+        register(SymmetryAnalysis())
+        register(SpeedAnalysis())
     }
 
     fun register(analysis: Analysis) {

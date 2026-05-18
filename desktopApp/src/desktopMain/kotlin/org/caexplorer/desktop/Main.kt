@@ -43,6 +43,7 @@ fun main() = application {
                 Item("Fit to Window", onClick = { AppActions.requestFitToWindow() })
             }
             Menu("Help") {
+                Item("User Guide", onClick = { AppActions.requestHelp() })
                 Item("Keyboard Shortcuts", onClick = { AppActions.requestKeyboardHelp() })
                 Separator()
                 Item("About CA Explorer", onClick = { AppActions.requestAbout() })

@@ -38,4 +38,6 @@ enum class AnalysisCategory(val displayName: String) {
     SPATIAL("Spatial"),
     INFORMATION("Information Theory"),
     DYNAMICS("Dynamics"),
+    DIMENSIONAL("Dimensional"),
+    VISUAL("Visual"),
 }

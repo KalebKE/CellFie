@@ -45,6 +45,7 @@ import org.caexplorer.ui.AppActions
 import org.caexplorer.ui.components.AboutDialog
 import org.caexplorer.ui.components.AnalysisDashboard
 import org.caexplorer.ui.components.ConfigPanel
+import org.caexplorer.ui.components.HelpDialog
 import org.caexplorer.ui.components.KeyboardShortcutsSheet
 import org.caexplorer.ui.components.RulePickerSheet
 import org.caexplorer.ui.components.SimulationCanvas
@@ -142,6 +143,7 @@ fun MainScreen() {
     // Dialog states
     var showAbout by remember { mutableStateOf(false) }
     var showKeyboardHelp by remember { mutableStateOf(false) }
+    var showHelp by remember { mutableStateOf(false) }
 
     // Canvas fade animation for rule switches
     var canvasFadeTrigger by remember { mutableStateOf(0) }
@@ -394,6 +396,10 @@ fun MainScreen() {
     LaunchedEffect(externalKeyboardHelp) {
         if (externalKeyboardHelp > 0) showKeyboardHelp = true
     }
+    val externalHelp = AppActions.helpTrigger
+    LaunchedEffect(externalHelp) {
+        if (externalHelp > 0) showHelp = true
+    }
 
     // Wire save/load triggers
     val externalSave = AppActions.saveTrigger
@@ -539,6 +545,7 @@ fun MainScreen() {
                             if (event.isShiftPressed) { showKeyboardHelp = true; true }
                             else false
                         }
+                        Key.H -> { showHelp = !showHelp; true }
                         Key.F1 -> { showKeyboardHelp = true; true }
                         else -> false
                     }
@@ -865,6 +872,11 @@ fun MainScreen() {
             // Keyboard shortcuts help dialog
             if (showKeyboardHelp) {
                 KeyboardShortcutsSheet(onDismiss = { showKeyboardHelp = false })
+            }
+
+            // User Guide help dialog
+            if (showHelp) {
+                HelpDialog(onDismiss = { showHelp = false })
             }
         }
     }
