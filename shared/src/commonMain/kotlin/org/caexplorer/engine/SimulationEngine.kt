@@ -71,7 +71,10 @@ class SimulationEngine {
     private var activeColorScheme: ColorScheme? = null
 
     private var simulationJob: Job? = null
-    private var config: SimulationConfig? = null
+    private var _config: SimulationConfig? = null
+
+    /** Current simulation configuration (read-only access for analysis). */
+    val config: SimulationConfig? get() = _config
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
@@ -87,7 +90,7 @@ class SimulationEngine {
      */
     fun configure(config: SimulationConfig) {
         stop()
-        this.config = config
+        this._config = config
         activeColorScheme = config.colorScheme
         _state.value = SimulationState(status = SimulationStatus.IDLE, generation = 0)
         updateColorBuffer(config)
@@ -193,7 +196,7 @@ class SimulationEngine {
     fun updateColorScheme(scheme: ColorScheme) {
         activeColorScheme = scheme
         val cfg = config ?: return
-        this.config = cfg.copy(colorScheme = scheme)
+        this._config = cfg.copy(colorScheme = scheme)
         updateColorBuffer(cfg)
     }
 

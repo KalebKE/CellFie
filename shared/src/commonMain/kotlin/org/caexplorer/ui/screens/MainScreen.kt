@@ -136,6 +136,26 @@ fun MainScreen() {
         engine.updateColorScheme(colorSchemes[selectedColorSchemeIndex])
     }
 
+    // Run analyses when panel is visible and generation changes
+    LaunchedEffect(showAnalysis, simState.generation) {
+        if (!showAnalysis) return@LaunchedEffect
+        val config = engine.config ?: return@LaunchedEffect
+        val gen = simState.generation
+        withContext(Dispatchers.Default) {
+            val results = linkedMapOf<String, List<AnalysisResult>>()
+            for (analysis in analyses) {
+                results[analysis.displayName] = analysis.analyze(config.lattice, config.rule, gen)
+            }
+            analysisResults = results
+        }
+    }
+
+    // Reset analyses on simulation reinit
+    LaunchedEffect(resetKey) {
+        analyses.forEach { it.reset() }
+        analysisResults = emptyMap()
+    }
+
     // Persist settings on changes
     LaunchedEffect(gridWidth, gridHeight) {
         AppSettings.putInt(SettingsKeys.GRID_WIDTH, gridWidth)
@@ -295,6 +315,7 @@ fun MainScreen() {
                         Key.G -> { gridVisible = !gridVisible; true }
                         Key.F -> { fitToWindowTrigger++; true }
                         Key.D -> { toggleDrawMode(); true }
+                        Key.A -> { showAnalysis = !showAnalysis; true }
                         Key.E -> {
                             exportImage(cellColors, gridWidth, gridHeight)
                             true
@@ -347,6 +368,16 @@ fun MainScreen() {
                             ),
                             modifier = Modifier.padding(end = 4.dp)
                         )
+
+                        // Analysis panel toggle
+                        IconButton(onClick = { showAnalysis = !showAnalysis }) {
+                            Icon(
+                                Icons.Default.BarChart,
+                                contentDescription = "Analysis (A)",
+                                tint = if (showAnalysis) MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
 
                         // Draw mode toggle
                         IconButton(onClick = { toggleDrawMode() }) {
@@ -459,6 +490,26 @@ fun MainScreen() {
                     .fillMaxSize()
                     .padding(padding)
             ) {
+                // Analysis panel (left side) with animated visibility
+                AnimatedVisibility(
+                    visible = showAnalysis,
+                    enter = slideInHorizontally(initialOffsetX = { -it }),
+                    exit = slideOutHorizontally(targetOffsetX = { -it })
+                ) {
+                    Row {
+                        Surface(
+                            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            modifier = Modifier.fillMaxHeight().width(300.dp)
+                        ) {
+                            AnalysisDashboard(
+                                results = analysisResults,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
+                        VerticalDivider()
+                    }
+                }
+
                 // Left: Canvas + Status Bar
                 Column(
                     modifier = Modifier
