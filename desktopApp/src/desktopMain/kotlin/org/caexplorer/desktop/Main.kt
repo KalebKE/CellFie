@@ -17,6 +17,7 @@ fun main() = application {
         MenuBar {
             Menu("File") {
                 Item("New Simulation", onClick = { AppActions.requestReset() })
+                Item("Export Image...", onClick = { AppActions.requestExportImage() })
                 Separator()
                 Item("Exit", onClick = ::exitApplication)
             }

@@ -18,9 +18,12 @@ object AppActions {
         private set
     var toggleGridTrigger by mutableStateOf(0)
         private set
+    var exportImageTrigger by mutableStateOf(0)
+        private set
 
     fun requestReset() { resetTrigger++ }
     fun requestToggleGrid() { toggleGridTrigger++ }
+    fun requestExportImage() { exportImageTrigger++ }
 }
 
 @Composable

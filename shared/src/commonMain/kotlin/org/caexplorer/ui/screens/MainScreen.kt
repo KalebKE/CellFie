@@ -31,6 +31,7 @@ import org.caexplorer.ui.components.ConfigPanel
 import org.caexplorer.ui.components.RulePickerSheet
 import org.caexplorer.ui.components.SimulationCanvas
 import org.caexplorer.ui.theme.ThemeState
+import org.caexplorer.ui.util.exportImage
 import kotlin.random.Random
 
 /**
@@ -83,6 +84,11 @@ fun MainScreen() {
 
     // Fit-to-window trigger for canvas zoom reset
     var fitToWindowTrigger by remember { mutableStateOf(0) }
+
+    // Draw mode
+    var drawMode by remember { mutableStateOf(false) }
+    // Track status before entering draw mode so we can restore it
+    var statusBeforeDrawMode by remember { mutableStateOf<SimulationStatus?>(null) }
 
     // Theme
     val isDark = ThemeState.useDarkTheme ?: isSystemInDarkTheme()
@@ -170,6 +176,12 @@ fun MainScreen() {
     LaunchedEffect(externalToggleGrid) {
         if (externalToggleGrid > 0) gridVisible = !gridVisible
     }
+    val externalExportImage = AppActions.exportImageTrigger
+    LaunchedEffect(externalExportImage) {
+        if (externalExportImage > 0) {
+            exportImage(cellColors, gridWidth, gridHeight)
+        }
+    }
 
     // Cleanup
     DisposableEffect(Unit) {
@@ -189,6 +201,27 @@ fun MainScreen() {
         }
     }
 
+    // Helper for toggling draw mode
+    fun toggleDrawMode() {
+        if (!drawMode) {
+            // Entering draw mode — auto-pause if running
+            if (simState.status == SimulationStatus.RUNNING) {
+                statusBeforeDrawMode = SimulationStatus.RUNNING
+                engine.pause()
+            } else {
+                statusBeforeDrawMode = null
+            }
+            drawMode = true
+        } else {
+            // Exiting draw mode — resume if was running
+            drawMode = false
+            if (statusBeforeDrawMode == SimulationStatus.RUNNING) {
+                engine.resume()
+            }
+            statusBeforeDrawMode = null
+        }
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -202,6 +235,11 @@ fun MainScreen() {
                         Key.R -> { engine.rewind(); true }
                         Key.G -> { gridVisible = !gridVisible; true }
                         Key.F -> { fitToWindowTrigger++; true }
+                        Key.D -> { toggleDrawMode(); true }
+                        Key.E -> {
+                            exportImage(cellColors, gridWidth, gridHeight)
+                            true
+                        }
                         Key.Equals -> {
                             if (speedIndex > 0) speedIndex--
                             true
@@ -276,6 +314,26 @@ fun MainScreen() {
                             label = { Text(speedLabel) },
                             modifier = Modifier.padding(end = 4.dp)
                         )
+
+                        // Draw mode toggle
+                        IconButton(onClick = { toggleDrawMode() }) {
+                            Icon(
+                                Icons.Default.Edit,
+                                contentDescription = "Draw mode (D)",
+                                tint = if (drawMode) MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+
+                        // Export image
+                        IconButton(onClick = {
+                            exportImage(cellColors, gridWidth, gridHeight)
+                        }) {
+                            Icon(
+                                Icons.Default.SaveAlt,
+                                contentDescription = "Export image (E)"
+                            )
+                        }
 
                         // Grid toggle
                         IconButton(onClick = { gridVisible = !gridVisible }) {
@@ -375,6 +433,13 @@ fun MainScreen() {
                     gridHeight = gridHeight,
                     gridVisible = gridVisible,
                     fitToWindowTrigger = fitToWindowTrigger,
+                    drawMode = drawMode,
+                    onCellToggle = { col, row -> engine.toggleCell(row, col) },
+                    onCellPaint = { col, row ->
+                        val numStates = (rules.getOrNull(selectedRuleIndex) as? IntegerRule)?.numStates ?: 2
+                        engine.paintCell(row, col, numStates - 1)
+                    },
+                    onPaintFinished = { engine.flushPaint() },
                     modifier = Modifier.fillMaxSize()
                 )
 

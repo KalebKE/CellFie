@@ -6,8 +6,10 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import org.caexplorer.domain.cell.Cell
 import org.caexplorer.domain.cellstate.CellState
+import org.caexplorer.domain.cellstate.IntegerCellState
 import org.caexplorer.domain.colorscheme.ColorScheme
 import org.caexplorer.domain.lattice.Lattice
+import org.caexplorer.domain.rule.IntegerRule
 import org.caexplorer.domain.rule.Rule
 import kotlin.time.TimeSource
 
@@ -72,6 +74,13 @@ class SimulationEngine {
     private var config: SimulationConfig? = null
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
+    // Reusable color buffer to reduce GC pressure
+    private var colorBuffer: IntArray = IntArray(0)
+
+    // Batch painting support
+    @Volatile
+    private var pendingColorUpdate = false
 
     /**
      * Load a new simulation configuration. Resets the engine.
@@ -197,6 +206,46 @@ class SimulationEngine {
         _state.value = SimulationState(status = SimulationStatus.IDLE, generation = 0)
     }
 
+    // --- Cell drawing / painting ---
+
+    /**
+     * Toggle a cell between empty and max state.
+     */
+    fun toggleCell(row: Int, col: Int) {
+        val cfg = config ?: return
+        if (row < 0 || row >= cfg.lattice.height || col < 0 || col >= cfg.lattice.width) return
+        val index = row * cfg.lattice.width + col
+        val cell = cfg.lattice.cells.getOrNull(index) ?: return
+        val numStates = (cfg.rule as? IntegerRule)?.numStates ?: 2
+        val current = cell.currentState.toInt()
+        val newState = if (current == 0) numStates - 1 else 0
+        cell.resetState(IntegerCellState(newState))
+        updateColorBuffer(cfg)
+    }
+
+    /**
+     * Paint a cell to a specific state. Batched — call [flushPaint] to update colors.
+     */
+    fun paintCell(row: Int, col: Int, state: Int) {
+        val cfg = config ?: return
+        if (row < 0 || row >= cfg.lattice.height || col < 0 || col >= cfg.lattice.width) return
+        val index = row * cfg.lattice.width + col
+        val cell = cfg.lattice.cells.getOrNull(index) ?: return
+        cell.resetState(IntegerCellState(state))
+        pendingColorUpdate = true
+    }
+
+    /**
+     * Flush any pending paint updates to the color buffer.
+     */
+    fun flushPaint() {
+        if (pendingColorUpdate) {
+            val cfg = config ?: return
+            updateColorBuffer(cfg)
+            pendingColorUpdate = false
+        }
+    }
+
     // --- Internal simulation loop ---
 
     private suspend fun runSimulation(cfg: SimulationConfig) {
@@ -283,22 +332,26 @@ class SimulationEngine {
 
     /**
      * Build the color buffer from current cell states.
+     * Reuses the existing buffer if the size matches to reduce GC pressure.
      */
     private fun updateColorBuffer(cfg: SimulationConfig) {
         val cells = cfg.lattice.cells
         val scheme = activeColorScheme ?: cfg.colorScheme
-        val numStates = (cfg.rule as? org.caexplorer.domain.rule.IntegerRule)?.numStates ?: 2
+        val numStates = (cfg.rule as? IntegerRule)?.numStates ?: 2
 
-        val colors = IntArray(cells.size) { i ->
+        if (colorBuffer.size != cells.size) {
+            colorBuffer = IntArray(cells.size)
+        }
+
+        for (i in cells.indices) {
             val state = cells[i].currentState.toInt()
             val color = scheme.getColor(state, numStates)
-            // Convert Compose Color to ARGB int
             val r = (color.red * 255).toInt()
             val g = (color.green * 255).toInt()
             val b = (color.blue * 255).toInt()
-            (0xFF shl 24) or (r shl 16) or (g shl 8) or b
+            colorBuffer[i] = (0xFF shl 24) or (r shl 16) or (g shl 8) or b
         }
-        _cellColors.value = colors
+        _cellColors.value = colorBuffer
     }
 }
 

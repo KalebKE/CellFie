@@ -1,6 +1,7 @@
 package org.caexplorer.ui.components
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.*
@@ -20,13 +21,11 @@ import kotlin.math.min
  * 2. We create an ImageBitmap (1 pixel per cell) via platform-specific code
  * 3. Compose draws this bitmap scaled to fill the viewport with nearest-neighbor filtering
  *
- * This matches the original Java approach (int[] → BufferedImage → Graphics2D.drawImage with scaling)
- * and achieves the same performance characteristics.
- *
  * Supports:
  * - Pinch/scroll zoom
  * - Pan/drag
  * - Grid overlay at sufficient zoom level
+ * - Draw mode: click/drag to paint cells
  */
 @Composable
 fun SimulationCanvas(
@@ -35,12 +34,19 @@ fun SimulationCanvas(
     gridHeight: Int,
     gridVisible: Boolean = false,
     fitToWindowTrigger: Int = 0,
+    drawMode: Boolean = false,
+    onCellToggle: ((col: Int, row: Int) -> Unit)? = null,
+    onCellPaint: ((col: Int, row: Int) -> Unit)? = null,
+    onPaintFinished: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
     onCellClick: ((col: Int, row: Int) -> Unit)? = null
 ) {
     // Zoom and pan state
     var scale by remember { mutableStateOf(1f) }
     var offset by remember { mutableStateOf(Offset.Zero) }
+
+    // Canvas size tracked for coordinate conversion
+    var canvasSize by remember { mutableStateOf(Offset.Zero) }
 
     // Reset zoom/pan when fitToWindowTrigger changes
     LaunchedEffect(fitToWindowTrigger) {
@@ -56,16 +62,75 @@ fun SimulationCanvas(
         else createCellBitmap(cellColors, gridWidth, gridHeight)
     }
 
+    // Coordinate conversion: screen position -> grid (col, row)
+    fun screenToCell(screenPos: Offset): Pair<Int, Int>? {
+        if (gridWidth <= 0 || gridHeight <= 0) return null
+        val cw = canvasSize.x
+        val ch = canvasSize.y
+        if (cw <= 0f || ch <= 0f) return null
+
+        val fitScaleX = cw / gridWidth.toFloat()
+        val fitScaleY = ch / gridHeight.toFloat()
+        val fitScale = min(fitScaleX, fitScaleY)
+        val totalScale = fitScale * scale
+
+        val gridPixelWidth = gridWidth * totalScale
+        val gridPixelHeight = gridHeight * totalScale
+        val centerOffsetX = (cw - gridPixelWidth) / 2f + offset.x
+        val centerOffsetY = (ch - gridPixelHeight) / 2f + offset.y
+
+        val col = ((screenPos.x - centerOffsetX) / totalScale).toInt()
+        val row = ((screenPos.y - centerOffsetY) / totalScale).toInt()
+
+        if (col < 0 || col >= gridWidth || row < 0 || row >= gridHeight) return null
+        return Pair(col, row)
+    }
+
     Canvas(
         modifier = modifier
             .fillMaxSize()
-            .pointerInput(Unit) {
-                detectTransformGestures { _, pan, zoom, _ ->
-                    scale = (scale * zoom).coerceIn(0.1f, 100f)
-                    offset += pan
+            .pointerInput(drawMode) {
+                if (drawMode) {
+                    // Draw mode: click/drag paints cells
+                    var lastPaintedCell: Pair<Int, Int>? = null
+                    detectDragGestures(
+                        onDragStart = { startPos ->
+                            lastPaintedCell = null
+                            val cell = screenToCell(startPos)
+                            if (cell != null) {
+                                onCellToggle?.invoke(cell.first, cell.second)
+                                lastPaintedCell = cell
+                            }
+                        },
+                        onDrag = { change, _ ->
+                            change.consume()
+                            val cell = screenToCell(change.position)
+                            if (cell != null && cell != lastPaintedCell) {
+                                onCellPaint?.invoke(cell.first, cell.second)
+                                lastPaintedCell = cell
+                            }
+                        },
+                        onDragEnd = {
+                            lastPaintedCell = null
+                            onPaintFinished?.invoke()
+                        },
+                        onDragCancel = {
+                            lastPaintedCell = null
+                            onPaintFinished?.invoke()
+                        }
+                    )
+                } else {
+                    // Pan/zoom mode
+                    detectTransformGestures { _, pan, zoom, _ ->
+                        scale = (scale * zoom).coerceIn(0.1f, 100f)
+                        offset += pan
+                    }
                 }
             }
     ) {
+        // Track canvas size for coordinate conversion
+        canvasSize = Offset(size.width, size.height)
+
         if (bitmap == null) return@Canvas
 
         val canvasWidth = size.width
