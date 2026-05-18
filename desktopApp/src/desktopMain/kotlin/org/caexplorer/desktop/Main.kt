@@ -19,6 +19,9 @@ fun main() = application {
                 Item("New Simulation", onClick = { AppActions.requestReset() })
                 Item("Export Image...", onClick = { AppActions.requestExportImage() })
                 Separator()
+                Item("Record GIF...", onClick = { AppActions.requestStartGif() })
+                Item("Stop Recording", onClick = { AppActions.requestStopGif() })
+                Separator()
                 Item("Exit", onClick = ::exitApplication)
             }
             Menu("View") {

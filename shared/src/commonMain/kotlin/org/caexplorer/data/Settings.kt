@@ -16,4 +16,5 @@ object SettingsKeys {
     const val LAST_RULE_INDEX = "last_rule_index"
     const val LAST_COLOR_SCHEME = "last_color_scheme"
     const val SPEED_INDEX = "speed_index"
+    const val LATTICE_TYPE = "lattice_type"
 }

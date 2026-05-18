@@ -32,7 +32,8 @@ import org.caexplorer.domain.cell.Cell
 import org.caexplorer.domain.cellstate.IntegerCellState
 import org.caexplorer.domain.cellstate.RealValuedState
 import org.caexplorer.domain.colorscheme.ALL_COLOR_SCHEMES
-import org.caexplorer.domain.lattice.SquareLattice
+import org.caexplorer.domain.lattice.LatticeType
+import org.caexplorer.domain.lattice.createLattice
 import org.caexplorer.domain.rule.*
 import org.caexplorer.engine.*
 import org.caexplorer.ui.AppActions
@@ -42,6 +43,7 @@ import org.caexplorer.ui.components.RulePickerSheet
 import org.caexplorer.ui.components.SimulationCanvas
 import org.caexplorer.ui.theme.ThemeState
 import org.caexplorer.ui.util.exportImage
+import org.caexplorer.ui.util.GifRecorder
 import kotlin.random.Random
 
 /**
@@ -96,6 +98,14 @@ fun MainScreen() {
     // Init pattern
     var initPattern by remember { mutableStateOf(InitPattern.AUTO) }
 
+    // Lattice type — load from settings
+    var selectedLatticeType by remember {
+        val saved = AppSettings.getString(SettingsKeys.LATTICE_TYPE, LatticeType.SQUARE_MOORE.name)
+        mutableStateOf(
+            try { LatticeType.valueOf(saved) } catch (_: Exception) { LatticeType.SQUARE_MOORE }
+        )
+    }
+
     // Reset key — incrementing triggers re-initialization
     var resetKey by remember { mutableStateOf(0) }
 
@@ -106,6 +116,12 @@ fun MainScreen() {
     var drawMode by remember { mutableStateOf(false) }
     // Track status before entering draw mode so we can restore it
     var statusBeforeDrawMode by remember { mutableStateOf<SimulationStatus?>(null) }
+
+    // GIF recording
+    val gifRecorder = remember { GifRecorder() }
+    var gifRecording by remember { mutableStateOf(false) }
+    var gifFrameCount by remember { mutableStateOf(0) }
+    val maxGifFrames = 500
 
     // Canvas fade animation for rule switches
     var canvasFadeTrigger by remember { mutableStateOf(0) }
@@ -156,6 +172,20 @@ fun MainScreen() {
         analysisResults = emptyMap()
     }
 
+    // Capture GIF frames when recording and generation changes
+    LaunchedEffect(gifRecording, simState.generation) {
+        if (!gifRecording) return@LaunchedEffect
+        if (cellColors.isNotEmpty()) {
+            gifRecorder.addFrame(cellColors, gridWidth, gridHeight)
+            gifFrameCount = gifRecorder.frameCount
+            if (gifRecorder.frameCount >= maxGifFrames) {
+                gifRecording = false
+                gifRecorder.stopAndSave()
+                gifFrameCount = 0
+            }
+        }
+    }
+
     // Persist settings on changes
     LaunchedEffect(gridWidth, gridHeight) {
         AppSettings.putInt(SettingsKeys.GRID_WIDTH, gridWidth)
@@ -178,12 +208,15 @@ fun MainScreen() {
     LaunchedEffect(speedIndex) {
         AppSettings.putInt(SettingsKeys.SPEED_INDEX, speedIndex)
     }
+    LaunchedEffect(selectedLatticeType) {
+        AppSettings.putString(SettingsKeys.LATTICE_TYPE, selectedLatticeType.name)
+    }
     LaunchedEffect(isDark) {
         AppSettings.putBoolean(SettingsKeys.DARK_THEME, isDark)
     }
 
-    // Initialize simulation on rule/grid/reset changes
-    LaunchedEffect(selectedRuleIndex, gridWidth, gridHeight, resetKey) {
+    // Initialize simulation on rule/grid/reset/lattice changes
+    LaunchedEffect(selectedRuleIndex, gridWidth, gridHeight, resetKey, selectedLatticeType) {
         val rule = rules.getOrNull(selectedRuleIndex) ?: return@LaunchedEffect
         val numStates = (rule as? IntegerRule)?.numStates ?: 2
         IntegerCellState.numStates = numStates
@@ -207,7 +240,7 @@ fun MainScreen() {
         val isRealRule = rule is RealRule
         val useRandomReals = isRealRule && !useGradient
 
-        val lattice = SquareLattice(gridWidth, gridHeight) { coord ->
+        val lattice = createLattice(selectedLatticeType, gridWidth, gridHeight) { coord ->
             when {
                 useRandomReals -> Cell(RealValuedState(Random.nextDouble()), coord)
                 isRealRule && useGradient -> {
@@ -259,6 +292,22 @@ fun MainScreen() {
     LaunchedEffect(externalExportImage) {
         if (externalExportImage > 0) {
             exportImage(cellColors, gridWidth, gridHeight)
+        }
+    }
+    val externalStartGif = AppActions.startGifTrigger
+    LaunchedEffect(externalStartGif) {
+        if (externalStartGif > 0 && !gifRecording) {
+            gifRecorder.startRecording(gridWidth, gridHeight)
+            gifRecording = true
+            gifFrameCount = 0
+        }
+    }
+    val externalStopGif = AppActions.stopGifTrigger
+    LaunchedEffect(externalStopGif) {
+        if (externalStopGif > 0 && gifRecording) {
+            gifRecording = false
+            gifRecorder.stopAndSave()
+            gifFrameCount = 0
         }
     }
 
@@ -413,6 +462,39 @@ fun MainScreen() {
                         // Settings toggle
                         IconButton(onClick = { showConfig = !showConfig }) {
                             Icon(Icons.Default.Tune, contentDescription = "Settings")
+                        }
+
+                        // GIF record toggle
+                        IconButton(onClick = {
+                            if (gifRecording) {
+                                gifRecording = false
+                                gifRecorder.stopAndSave()
+                                gifFrameCount = 0
+                            } else {
+                                gifRecorder.startRecording(gridWidth, gridHeight)
+                                gifRecording = true
+                                gifFrameCount = 0
+                            }
+                        }) {
+                            if (gifRecording) {
+                                BadgedBox(
+                                    badge = {
+                                        Badge { Text("$gifFrameCount") }
+                                    }
+                                ) {
+                                    Icon(
+                                        Icons.Default.Stop,
+                                        contentDescription = "Stop recording",
+                                        tint = MaterialTheme.colorScheme.error
+                                    )
+                                }
+                            } else {
+                                Icon(
+                                    Icons.Default.FiberManualRecord,
+                                    contentDescription = "Record GIF",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
                         }
 
                         // Export image
@@ -595,6 +677,8 @@ fun MainScreen() {
                                 onSpeedIndexChanged = { speedIndex = it },
                                 initPattern = initPattern,
                                 onInitPatternChanged = { initPattern = it },
+                                selectedLatticeType = selectedLatticeType,
+                                onLatticeTypeChanged = { selectedLatticeType = it },
                                 onResetSimulation = { engine.stop(); resetKey++ },
                                 onDismiss = { showConfig = false }
                             )

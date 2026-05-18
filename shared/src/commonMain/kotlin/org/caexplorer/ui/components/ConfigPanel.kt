@@ -14,6 +14,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import org.caexplorer.domain.colorscheme.ColorScheme as CAColorScheme
+import org.caexplorer.domain.lattice.LatticeType
 import org.caexplorer.ui.screens.InitPattern
 import kotlin.math.roundToInt
 
@@ -67,6 +68,8 @@ fun ConfigPanel(
     onSpeedIndexChanged: (Int) -> Unit,
     initPattern: InitPattern,
     onInitPatternChanged: (InitPattern) -> Unit,
+    selectedLatticeType: LatticeType,
+    onLatticeTypeChanged: (LatticeType) -> Unit,
     onResetSimulation: () -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier
@@ -74,6 +77,7 @@ fun ConfigPanel(
     var widthSlider by remember(gridWidth) { mutableStateOf(gridWidth.toFloat()) }
     var heightSlider by remember(gridHeight) { mutableStateOf(gridHeight.toFloat()) }
 
+    var latticeTypeExpanded by remember { mutableStateOf(true) }
     var colorSchemeExpanded by remember { mutableStateOf(true) }
     var speedExpanded by remember { mutableStateOf(true) }
     var initPatternExpanded by remember { mutableStateOf(true) }
@@ -135,6 +139,52 @@ fun ConfigPanel(
                                 csExpanded = false
                             }
                         )
+                    }
+                }
+            }
+        }
+
+        HorizontalDivider()
+
+        // --- Lattice Type ---
+        SectionHeader("Lattice Type", latticeTypeExpanded) { latticeTypeExpanded = !latticeTypeExpanded }
+        AnimatedVisibility(
+            visible = latticeTypeExpanded,
+            enter = expandVertically(),
+            exit = shrinkVertically()
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Box {
+                    var ltExpanded by remember { mutableStateOf(false) }
+                    OutlinedButton(
+                        onClick = { ltExpanded = true },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(selectedLatticeType.displayName, modifier = Modifier.weight(1f))
+                        Icon(Icons.Default.ArrowDropDown, null)
+                    }
+                    DropdownMenu(
+                        expanded = ltExpanded,
+                        onDismissRequest = { ltExpanded = false }
+                    ) {
+                        LatticeType.entries.forEach { type ->
+                            DropdownMenuItem(
+                                text = {
+                                    Column {
+                                        Text(type.displayName)
+                                        Text(
+                                            type.description,
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                },
+                                onClick = {
+                                    onLatticeTypeChanged(type)
+                                    ltExpanded = false
+                                }
+                            )
+                        }
                     }
                 }
             }

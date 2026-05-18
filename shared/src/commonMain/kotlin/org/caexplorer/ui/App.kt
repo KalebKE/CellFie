@@ -20,10 +20,16 @@ object AppActions {
         private set
     var exportImageTrigger by mutableStateOf(0)
         private set
+    var startGifTrigger by mutableStateOf(0)
+        private set
+    var stopGifTrigger by mutableStateOf(0)
+        private set
 
     fun requestReset() { resetTrigger++ }
     fun requestToggleGrid() { toggleGridTrigger++ }
     fun requestExportImage() { exportImageTrigger++ }
+    fun requestStartGif() { startGifTrigger++ }
+    fun requestStopGif() { stopGifTrigger++ }
 }
 
 @Composable
