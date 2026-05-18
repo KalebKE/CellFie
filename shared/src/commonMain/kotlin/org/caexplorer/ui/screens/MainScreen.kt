@@ -1,10 +1,9 @@
 package org.caexplorer.ui.screens
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -18,6 +17,8 @@ import org.caexplorer.domain.rule.IntegerRule
 import org.caexplorer.domain.rule.RuleRegistry
 import org.caexplorer.domain.util.Coordinate
 import org.caexplorer.engine.*
+import org.caexplorer.ui.components.ConfigPanel
+import org.caexplorer.ui.components.RulePickerSheet
 import org.caexplorer.ui.components.SimulationCanvas
 
 /**
@@ -35,6 +36,7 @@ fun MainScreen() {
     var gridWidth by remember { mutableStateOf(200) }
     var gridHeight by remember { mutableStateOf(200) }
     var gridVisible by remember { mutableStateOf(false) }
+    var showConfig by remember { mutableStateOf(false) }
 
     // Rule selection
     val rules = remember { RuleRegistry.getFeaturedRules() }
@@ -86,10 +88,18 @@ fun MainScreen() {
                     }
                     // Grid toggle
                     IconButton(onClick = { gridVisible = !gridVisible }) {
-                        Text(
-                            "⊞",
-                            color = if (gridVisible) MaterialTheme.colorScheme.primary
+                        Icon(
+                            Icons.Default.GridOn,
+                            contentDescription = "Toggle grid",
+                            tint = if (gridVisible) MaterialTheme.colorScheme.primary
                             else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    // Settings
+                    IconButton(onClick = { showConfig = !showConfig }) {
+                        Icon(
+                            Icons.Default.Tune,
+                            contentDescription = "Settings"
                         )
                     }
                 },
@@ -108,7 +118,7 @@ fun MainScreen() {
                     onClick = { engine.step() },
                     containerColor = MaterialTheme.colorScheme.secondaryContainer
                 ) {
-                    Text("⏭")
+                    Icon(Icons.Default.SkipNext, "Step")
                 }
 
                 // Rewind button
@@ -116,7 +126,7 @@ fun MainScreen() {
                     onClick = { engine.rewind() },
                     containerColor = MaterialTheme.colorScheme.secondaryContainer
                 ) {
-                    Text("⏮")
+                    Icon(Icons.Default.Replay, "Rewind")
                 }
 
                 // Play/Pause FAB
@@ -132,14 +142,20 @@ fun MainScreen() {
                     containerColor = MaterialTheme.colorScheme.primaryContainer,
                     contentColor = MaterialTheme.colorScheme.onPrimaryContainer
                 ) {
-                    Text(
-                        if (simState.status == SimulationStatus.RUNNING) "⏸" else "▶",
-                        style = MaterialTheme.typography.titleLarge
+                    Icon(
+                        if (simState.status == SimulationStatus.RUNNING)
+                            Icons.Default.Pause
+                        else Icons.Default.PlayArrow,
+                        contentDescription = if (simState.status == SimulationStatus.RUNNING)
+                            "Pause" else "Play"
                     )
                 }
             }
         }
     ) { padding ->
+        // Rule picker dialog state
+        var showRulePicker by remember { mutableStateOf(false) }
+
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -155,26 +171,53 @@ fun MainScreen() {
                 modifier = Modifier.fillMaxSize()
             )
 
-            // Rule selector chip
-            AnimatedVisibility(
-                visible = true,
-                enter = fadeIn(),
-                exit = fadeOut(),
-                modifier = Modifier.align(Alignment.BottomStart).padding(16.dp)
-            ) {
-                ElevatedFilterChip(
-                    selected = true,
-                    onClick = {
-                        selectedRuleIndex = (selectedRuleIndex + 1) % rules.size
+            // Config panel (top-end overlay)
+            if (showConfig) {
+                ConfigPanel(
+                    gridWidth = gridWidth,
+                    gridHeight = gridHeight,
+                    onGridSizeChanged = { w, h ->
+                        gridWidth = w
+                        gridHeight = h
                     },
-                    label = {
-                        Text(
-                            rules.getOrNull(selectedRuleIndex)?.displayName ?: "None",
-                            style = MaterialTheme.typography.labelMedium
-                        )
-                    }
+                    onDismiss = { showConfig = false },
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(8.dp)
                 )
             }
+
+            // Rule selector chip
+            ElevatedFilterChip(
+                selected = true,
+                onClick = { showRulePicker = true },
+                label = {
+                    Text(
+                        rules.getOrNull(selectedRuleIndex)?.displayName ?: "None",
+                        style = MaterialTheme.typography.labelMedium
+                    )
+                },
+                leadingIcon = {
+                    Icon(
+                        Icons.Default.AutoAwesome,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp)
+                    )
+                },
+                modifier = Modifier.align(Alignment.BottomStart).padding(16.dp)
+            )
+        }
+
+        // Rule picker bottom sheet
+        if (showRulePicker) {
+            RulePickerSheet(
+                rules = rules,
+                selectedRule = rules.getOrNull(selectedRuleIndex),
+                onRuleSelected = { rule ->
+                    selectedRuleIndex = rules.indexOf(rule)
+                },
+                onDismiss = { showRulePicker = false }
+            )
         }
     }
 }
