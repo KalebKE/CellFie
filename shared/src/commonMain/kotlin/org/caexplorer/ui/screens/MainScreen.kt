@@ -117,7 +117,7 @@ fun MainScreen(
     }
 
     // Current rule instance (may differ from rules[selectedRuleIndex] if properties were changed)
-    var currentRule by remember { mutableStateOf<Rule?>(null) }
+    var currentRule by remember { mutableStateOf<Rule?>(rules.getOrNull(selectedRuleIndex)) }
 
     // Init pattern
     var initPattern by remember { mutableStateOf(InitPattern.AUTO) }
@@ -228,6 +228,7 @@ fun MainScreen(
     }
     LaunchedEffect(selectedRuleIndex) {
         AppSettings.putInt(SettingsKeys.LAST_RULE_INDEX, selectedRuleIndex)
+        currentRule = rules.getOrNull(selectedRuleIndex)
         // Trigger canvas fade on rule switch
         canvasFadeTrigger++
     }
