@@ -7,7 +7,9 @@ import org.caexplorer.domain.cellstate.RealValuedState
 import org.caexplorer.domain.rule.BinaryRule
 import org.caexplorer.domain.rule.IntegerRule
 import org.caexplorer.domain.rule.RealRule
+import org.caexplorer.domain.rule.Rule
 import org.caexplorer.domain.rule.RuleCategory
+import org.caexplorer.domain.rule.RuleProperty
 import kotlin.math.exp
 import kotlin.math.floor
 import kotlin.math.round
@@ -247,6 +249,14 @@ class Spirals(override val numStates: Int = 5) : IntegerRule() {
 
     override fun createInitialState(): CellState = IntegerCellState(0)
 
+    override val properties get() = listOf(
+        RuleProperty.IntProperty("numStates", "States", numStates, 3, 256, "Number of cell states")
+    )
+    override fun withProperty(key: String, value: Any): Rule = when (key) {
+        "numStates" -> Spirals((value as Number).toInt().coerceIn(3, 256))
+        else -> this
+    }
+
     private operator fun IntArray.contains(value: Int): Boolean {
         for (v in this) if (v == value) return true
         return false
@@ -324,6 +334,16 @@ class MajorityVote(
     }
 
     override fun createInitialState(): CellState = IntegerCellState(0)
+
+    override val properties get() = listOf(
+        RuleProperty.IntProperty("numStates", "States", numStates, 2, 256, "Number of cell states"),
+        RuleProperty.BooleanProperty("includeSelf", "Include Self", includeSelf, "Count cell's own state in vote")
+    )
+    override fun withProperty(key: String, value: Any): Rule = when (key) {
+        "numStates" -> MajorityVote((value as Number).toInt().coerceIn(2, 256), includeSelf)
+        "includeSelf" -> MajorityVote(numStates, value as Boolean)
+        else -> this
+    }
 }
 
 // =============================================================================
@@ -339,29 +359,37 @@ class MajorityVote(
  *
  * Port of Java NeuralNet.
  */
-class NeuralNetCA(override val numStates: Int = 5) : IntegerRule() {
+class NeuralNetCA(
+    override val numStates: Int = 10,
+    val slope: Float = 2.0f,
+    val selfWeight: Float = -0.5f,
+    val noise: Float = 0.05f
+) : IntegerRule() {
     override val displayName = "Neural Net"
-    override val description = "Each cell is a neuron with sigmoid activation"
+    override val description = "Neurons with sigmoid activation, self-inhibition, and noise"
     override val category = RuleCategory.NEURAL
     override val compatibleLatticeNames = listOf("Square (Moore)")
 
     override fun nextState(cell: Cell, neighbors: Array<Cell>): CellState {
         val halfRange = (numStates - 1.0) / 2.0
+        val k = slope.toDouble() / neighbors.size
 
-        // The slope is empirically tuned to keep behavior near criticality
-        val slope = 1.0 / ((neighbors.size / 2.0) * numStates.toDouble())
+        // Self-connection: negative = inhibitory (creates oscillation)
+        var weightedSum = (cell.currentState.toInt().toDouble() - halfRange) * selfWeight
 
-        // Sum weighted inputs (rescaled to center around 0)
-        var weightedSum = 0.0
+        // Neighbor inputs
         for (n in neighbors) {
-            val rescaled = n.currentState.toInt().toDouble() - halfRange
-            weightedSum += rescaled // weight = 1.0
+            weightedSum += (n.currentState.toInt().toDouble() - halfRange)
         }
 
-        // Sigmoid transfer function: output in (0, 1)
-        val sigmoidOutput = 1.0 / (1.0 + exp(-slope * weightedSum))
+        // Stochastic perturbation prevents fixed-point convergence
+        if (noise > 0f) {
+            weightedSum += (Random.nextDouble() - 0.5) * noise * numStates
+        }
 
-        // Scale to [0, numStates-1] and round
+        // Sigmoid transfer function
+        val sigmoidOutput = 1.0 / (1.0 + exp(-k * weightedSum))
+
         val scaled = sigmoidOutput * (numStates - 1)
         val cellValue = round(scaled).toInt().coerceIn(0, numStates - 1)
 
@@ -369,6 +397,20 @@ class NeuralNetCA(override val numStates: Int = 5) : IntegerRule() {
     }
 
     override fun createInitialState(): CellState = IntegerCellState(0)
+
+    override val properties get() = listOf(
+        RuleProperty.IntProperty("numStates", "States", numStates, 2, 256, "Number of cell states"),
+        RuleProperty.FloatProperty("slope", "Slope", slope, 0.5f, 8.0f, "Activation steepness"),
+        RuleProperty.FloatProperty("selfWeight", "Self Weight", selfWeight, -2.0f, 2.0f, "Self-connection (-=inhibit, +=excite)"),
+        RuleProperty.FloatProperty("noise", "Noise", noise, 0.0f, 0.5f, "Random perturbation")
+    )
+    override fun withProperty(key: String, value: Any): Rule = when (key) {
+        "numStates" -> NeuralNetCA((value as Number).toInt().coerceIn(2, 256), slope, selfWeight, noise)
+        "slope" -> NeuralNetCA(numStates, (value as Number).toFloat().coerceIn(0.5f, 8.0f), selfWeight, noise)
+        "selfWeight" -> NeuralNetCA(numStates, slope, (value as Number).toFloat().coerceIn(-2.0f, 2.0f), noise)
+        "noise" -> NeuralNetCA(numStates, slope, selfWeight, (value as Number).toFloat().coerceIn(0.0f, 0.5f))
+        else -> this
+    }
 }
 
 // =============================================================================
@@ -407,6 +449,14 @@ class GrowingSeed(override val numStates: Int = 16) : IntegerRule() {
     }
 
     override fun createInitialState(): CellState = IntegerCellState(0)
+
+    override val properties get() = listOf(
+        RuleProperty.IntProperty("numStates", "States", numStates, 2, 256, "Number of cell states")
+    )
+    override fun withProperty(key: String, value: Any): Rule = when (key) {
+        "numStates" -> GrowingSeed((value as Number).toInt().coerceIn(2, 256))
+        else -> this
+    }
 }
 
 // =============================================================================
@@ -444,6 +494,16 @@ class LavaLamp(override val numStates: Int = 3, val triggerNumber: Int = 10) : I
     }
 
     override fun createInitialState(): CellState = IntegerCellState(0)
+
+    override val properties get() = listOf(
+        RuleProperty.IntProperty("numStates", "States", numStates, 2, 256, "Number of cell states"),
+        RuleProperty.IntProperty("triggerNumber", "Trigger", triggerNumber, 1, 24, "Neighbors needed to advance state")
+    )
+    override fun withProperty(key: String, value: Any): Rule = when (key) {
+        "numStates" -> LavaLamp((value as Number).toInt().coerceIn(2, 256), triggerNumber)
+        "triggerNumber" -> LavaLamp(numStates, (value as Number).toInt().coerceIn(1, 24))
+        else -> this
+    }
 }
 
 // =============================================================================
