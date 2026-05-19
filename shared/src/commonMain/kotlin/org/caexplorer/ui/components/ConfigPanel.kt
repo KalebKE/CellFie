@@ -17,6 +17,7 @@ import org.caexplorer.domain.colorscheme.ColorScheme as CAColorScheme
 import org.caexplorer.domain.lattice.LatticeType
 import org.caexplorer.domain.rule.Rule
 import org.caexplorer.ui.screens.InitPattern
+import org.caexplorer.ui.theme.AppPalette
 import kotlin.math.roundToInt
 
 /**
@@ -60,6 +61,8 @@ fun ConfigPanel(
     gridWidth: Int,
     gridHeight: Int,
     onGridSizeChanged: (width: Int, height: Int) -> Unit,
+    gridDepth: Int = 20,
+    onGridDepthChanged: (Int) -> Unit = {},
     colorSchemes: List<CAColorScheme>,
     selectedColorSchemeIndex: Int,
     onColorSchemeChanged: (Int) -> Unit,
@@ -71,6 +74,8 @@ fun ConfigPanel(
     onInitPatternChanged: (InitPattern) -> Unit,
     selectedLatticeType: LatticeType,
     onLatticeTypeChanged: (LatticeType) -> Unit,
+    selectedPalette: AppPalette = AppPalette.FIRE,
+    onPaletteChanged: (AppPalette) -> Unit = {},
     currentRule: Rule? = null,
     onRuleChanged: ((Rule) -> Unit)? = null,
     onResetSimulation: () -> Unit,
@@ -79,9 +84,11 @@ fun ConfigPanel(
 ) {
     var widthSlider by remember(gridWidth) { mutableStateOf(gridWidth.toFloat()) }
     var heightSlider by remember(gridHeight) { mutableStateOf(gridHeight.toFloat()) }
+    var depthSlider by remember(gridDepth) { mutableStateOf(gridDepth.toFloat()) }
 
     var latticeTypeExpanded by remember { mutableStateOf(true) }
     var colorSchemeExpanded by remember { mutableStateOf(true) }
+    var appThemeExpanded by remember { mutableStateOf(true) }
     var speedExpanded by remember { mutableStateOf(true) }
     var initPatternExpanded by remember { mutableStateOf(true) }
     var gridSizeExpanded by remember { mutableStateOf(true) }
@@ -107,6 +114,41 @@ fun ConfigPanel(
             )
             IconButton(onClick = onDismiss) {
                 Icon(Icons.Default.Close, "Close")
+            }
+        }
+
+        HorizontalDivider()
+
+        // --- App Theme ---
+        SectionHeader("App Theme", appThemeExpanded) { appThemeExpanded = !appThemeExpanded }
+        AnimatedVisibility(
+            visible = appThemeExpanded,
+            enter = expandVertically(),
+            exit = shrinkVertically()
+        ) {
+            Box {
+                var atExpanded by remember { mutableStateOf(false) }
+                OutlinedButton(
+                    onClick = { atExpanded = true },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(selectedPalette.displayName, modifier = Modifier.weight(1f))
+                    Icon(Icons.Default.ArrowDropDown, null)
+                }
+                DropdownMenu(
+                    expanded = atExpanded,
+                    onDismissRequest = { atExpanded = false }
+                ) {
+                    AppPalette.entries.forEach { palette ->
+                        DropdownMenuItem(
+                            text = { Text(palette.displayName) },
+                            onClick = {
+                                onPaletteChanged(palette)
+                                atExpanded = false
+                            }
+                        )
+                    }
+                }
             }
         }
 
@@ -303,26 +345,68 @@ fun ConfigPanel(
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    SuggestionChip(
-                        onClick = {
-                            widthSlider = 100f; heightSlider = 100f
-                            onGridSizeChanged(100, 100)
-                        },
-                        label = { Text("100²") }
+                    if (selectedLatticeType.is3D) {
+                        SuggestionChip(
+                            onClick = {
+                                widthSlider = 20f; heightSlider = 20f; depthSlider = 20f
+                                onGridSizeChanged(20, 20); onGridDepthChanged(20)
+                            },
+                            label = { Text("20³") }
+                        )
+                        SuggestionChip(
+                            onClick = {
+                                widthSlider = 30f; heightSlider = 30f; depthSlider = 30f
+                                onGridSizeChanged(30, 30); onGridDepthChanged(30)
+                            },
+                            label = { Text("30³") }
+                        )
+                        SuggestionChip(
+                            onClick = {
+                                widthSlider = 50f; heightSlider = 50f; depthSlider = 50f
+                                onGridSizeChanged(50, 50); onGridDepthChanged(50)
+                            },
+                            label = { Text("50³") }
+                        )
+                    } else {
+                        SuggestionChip(
+                            onClick = {
+                                widthSlider = 100f; heightSlider = 100f
+                                onGridSizeChanged(100, 100)
+                            },
+                            label = { Text("100²") }
+                        )
+                        SuggestionChip(
+                            onClick = {
+                                widthSlider = 200f; heightSlider = 200f
+                                onGridSizeChanged(200, 200)
+                            },
+                            label = { Text("200²") }
+                        )
+                        SuggestionChip(
+                            onClick = {
+                                widthSlider = 500f; heightSlider = 500f
+                                onGridSizeChanged(500, 500)
+                            },
+                            label = { Text("500²") }
+                        )
+                    }
+                }
+
+                // Depth slider (3D only)
+                if (selectedLatticeType.is3D) {
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        "Depth: ${depthSlider.roundToInt()}",
+                        style = MaterialTheme.typography.bodySmall
                     )
-                    SuggestionChip(
-                        onClick = {
-                            widthSlider = 200f; heightSlider = 200f
-                            onGridSizeChanged(200, 200)
+                    Slider(
+                        value = depthSlider,
+                        onValueChange = { depthSlider = it },
+                        onValueChangeFinished = {
+                            onGridDepthChanged(depthSlider.roundToInt())
                         },
-                        label = { Text("200²") }
-                    )
-                    SuggestionChip(
-                        onClick = {
-                            widthSlider = 500f; heightSlider = 500f
-                            onGridSizeChanged(500, 500)
-                        },
-                        label = { Text("500²") }
+                        valueRange = 5f..50f,
+                        steps = 8
                     )
                 }
             }

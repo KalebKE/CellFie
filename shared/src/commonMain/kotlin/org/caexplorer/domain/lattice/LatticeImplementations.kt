@@ -300,3 +300,84 @@ class GlobalSquareLattice(
         }
     }
 }
+
+/**
+ * 3D cube lattice with Moore neighborhood (26 neighbors).
+ * Includes all cells within a distance of 1 in each axis (including diagonals).
+ */
+class CubeMooreLattice(
+    width: Int,
+    height: Int,
+    depth: Int,
+    boundaryCondition: BoundaryCondition = BoundaryCondition.WRAP_AROUND,
+    cellFactory: (Coordinate) -> Cell
+) : ThreeDimensionalLattice(width, height, depth, boundaryCondition) {
+
+    override val displayName = "Cube (Moore)"
+
+    override val cells: Array<Cell> = Array(width * height * depth) { i ->
+        val layer = i / (width * height)
+        val rem = i % (width * height)
+        cellFactory(Coordinate(rem / width, rem % width, layer))
+    }
+
+    override fun getNeighbors(cell: Cell): Array<Cell> {
+        val row = cell.coordinate.row
+        val col = cell.coordinate.col
+        val layer = cell.coordinate.layer
+        val neighbors = Array<Cell?>(26) { null }
+        var idx = 0
+
+        for (dl in -1..1) {
+            val l = resolveLayer(layer + dl)
+            for (dr in -1..1) {
+                val r = resolveRow(row + dr)
+                for (dc in -1..1) {
+                    if (dl == 0 && dr == 0 && dc == 0) continue
+                    val c = resolveCol(col + dc)
+                    neighbors[idx++] = cells[coordinateToIndex(r, c, l)]
+                }
+            }
+        }
+
+        @Suppress("UNCHECKED_CAST")
+        return neighbors as Array<Cell>
+    }
+}
+
+/**
+ * 3D cube lattice with Von Neumann neighborhood (6 neighbors).
+ * Includes only the 6 face-adjacent cells (±row, ±col, ±layer).
+ */
+class CubeVonNeumannLattice(
+    width: Int,
+    height: Int,
+    depth: Int,
+    boundaryCondition: BoundaryCondition = BoundaryCondition.WRAP_AROUND,
+    cellFactory: (Coordinate) -> Cell
+) : ThreeDimensionalLattice(width, height, depth, boundaryCondition) {
+
+    override val displayName = "Cube (Von Neumann)"
+
+    override val cells: Array<Cell> = Array(width * height * depth) { i ->
+        val layer = i / (width * height)
+        val rem = i % (width * height)
+        cellFactory(Coordinate(rem / width, rem % width, layer))
+    }
+
+    override fun getNeighbors(cell: Cell): Array<Cell> {
+        val row = cell.coordinate.row
+        val col = cell.coordinate.col
+        val layer = cell.coordinate.layer
+        val ss = width * height
+
+        return arrayOf(
+            cells[resolveLayer(layer - 1) * ss + row * width + col],       // front
+            cells[resolveLayer(layer + 1) * ss + row * width + col],       // back
+            cells[layer * ss + resolveRow(row - 1) * width + col],         // up
+            cells[layer * ss + resolveRow(row + 1) * width + col],         // down
+            cells[layer * ss + row * width + resolveCol(col - 1)],         // left
+            cells[layer * ss + row * width + resolveCol(col + 1)],         // right
+        )
+    }
+}

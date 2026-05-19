@@ -49,8 +49,10 @@ import org.caexplorer.ui.components.HelpDialog
 import org.caexplorer.ui.components.KeyboardShortcutsSheet
 import org.caexplorer.ui.components.RulePickerSheet
 import org.caexplorer.ui.components.SimulationCanvas
+import org.caexplorer.ui.components.VoxelCanvas
 import org.caexplorer.ui.util.exportImage
 import org.caexplorer.ui.util.GifRecorder
+import org.caexplorer.ui.theme.AppPalette
 import kotlin.math.min
 import kotlin.random.Random
 
@@ -77,15 +79,20 @@ enum class InitPattern(val displayName: String) {
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MainScreen() {
+fun MainScreen(
+    selectedPalette: AppPalette = AppPalette.FIRE,
+    onPaletteChanged: (AppPalette) -> Unit = {}
+) {
     // Engine
     val engine = remember { SimulationEngine() }
     val simState by engine.state.collectAsState()
     val cellColors by engine.cellColors.collectAsState()
+    val cellStates by engine.cellStates.collectAsState()
 
     // Grid configuration — load from settings
     var gridWidth by remember { mutableStateOf(AppSettings.getInt(SettingsKeys.GRID_WIDTH, 200)) }
     var gridHeight by remember { mutableStateOf(AppSettings.getInt(SettingsKeys.GRID_HEIGHT, 200)) }
+    var gridDepth by remember { mutableStateOf(AppSettings.getInt(SettingsKeys.GRID_DEPTH, 20)) }
     var gridVisible by remember { mutableStateOf(false) }
     var showConfig by remember { mutableStateOf(false) }
     var showAnalysis by remember { mutableStateOf(false) }
@@ -198,9 +205,10 @@ fun MainScreen() {
     }
 
     // Persist settings on changes
-    LaunchedEffect(gridWidth, gridHeight) {
+    LaunchedEffect(gridWidth, gridHeight, gridDepth) {
         AppSettings.putInt(SettingsKeys.GRID_WIDTH, gridWidth)
         AppSettings.putInt(SettingsKeys.GRID_HEIGHT, gridHeight)
+        AppSettings.putInt(SettingsKeys.GRID_DEPTH, gridDepth)
     }
     LaunchedEffect(selectedRuleIndex) {
         AppSettings.putInt(SettingsKeys.LAST_RULE_INDEX, selectedRuleIndex)
@@ -221,9 +229,14 @@ fun MainScreen() {
     }
     LaunchedEffect(selectedLatticeType) {
         AppSettings.putString(SettingsKeys.LATTICE_TYPE, selectedLatticeType.name)
+        // Auto-reduce grid size when switching to 3D to avoid excessive cell count
+        if (selectedLatticeType.is3D) {
+            if (gridWidth > 50) gridWidth = 30
+            if (gridHeight > 50) gridHeight = 30
+        }
     }
     // Initialize simulation on rule/grid/reset/lattice changes
-    LaunchedEffect(selectedRuleIndex, gridWidth, gridHeight, resetKey, selectedLatticeType) {
+    LaunchedEffect(selectedRuleIndex, gridWidth, gridHeight, gridDepth, resetKey, selectedLatticeType) {
         val rule = currentRule ?: rules.getOrNull(selectedRuleIndex) ?: return@LaunchedEffect
         val numStates = (rule as? IntegerRule)?.numStates ?: 2
         IntegerCellState.numStates = numStates
@@ -266,7 +279,9 @@ fun MainScreen() {
             }
         } else null
 
-        val lattice = createLattice(selectedLatticeType, gridWidth, gridHeight) { coord ->
+        val latticeDepth = if (selectedLatticeType.is3D) gridDepth else 1
+
+        val lattice = createLattice(selectedLatticeType, gridWidth, gridHeight, latticeDepth) { coord ->
             when {
                 useRandomReals -> Cell(RealValuedState(Random.nextDouble()), coord)
                 isRealRule && useGradient -> {
@@ -274,8 +289,9 @@ fun MainScreen() {
                 }
                 isRealRule -> Cell(RealValuedState(0.0), coord)
                 useCenter -> {
-                    val state = if (coord.row == gridHeight / 2 && coord.col == gridWidth / 2)
-                        numStates - 1 else 0
+                    val atCenter = coord.row == gridHeight / 2 && coord.col == gridWidth / 2 &&
+                        (!selectedLatticeType.is3D || coord.layer == latticeDepth / 2)
+                    val state = if (atCenter) numStates - 1 else 0
                     Cell(IntegerCellState(state), coord)
                 }
                 useGradient -> {
@@ -289,15 +305,17 @@ fun MainScreen() {
                 initPattern == InitPattern.DISK -> {
                     val dx = coord.col - gridWidth / 2
                     val dy = coord.row - gridHeight / 2
+                    val dz = if (selectedLatticeType.is3D) coord.layer - latticeDepth / 2 else 0
                     val r = min(gridWidth, gridHeight) / 4
-                    val state = if (dx * dx + dy * dy <= r * r) numStates - 1 else 0
+                    val state = if (dx * dx + dy * dy + dz * dz <= r * r) numStates - 1 else 0
                     Cell(IntegerCellState(state), coord)
                 }
                 initPattern == InitPattern.RING -> {
                     val dx = coord.col - gridWidth / 2
                     val dy = coord.row - gridHeight / 2
+                    val dz = if (selectedLatticeType.is3D) coord.layer - latticeDepth / 2 else 0
                     val r = min(gridWidth, gridHeight) / 4
-                    val distSq = dx * dx + dy * dy
+                    val distSq = dx * dx + dy * dy + dz * dz
                     val innerR = (r * 0.6).toInt()
                     val state = if (distSq <= r * r && distSq > innerR * innerR) numStates - 1 else 0
                     Cell(IntegerCellState(state), coord)
@@ -562,12 +580,18 @@ fun MainScreen() {
                         Text("CA Explorer")
                     },
                     actions = {
-                        // Status badge with animated color
+                        // Status badge with animated color and proper icons
                         val statusText = when (simState.status) {
-                            SimulationStatus.RUNNING -> "▶ Running"
-                            SimulationStatus.PAUSED -> "⏸ Paused"
-                            SimulationStatus.IDLE -> "⏹ Idle"
-                            SimulationStatus.STEPPING -> "⏭ Step"
+                            SimulationStatus.RUNNING -> "Running"
+                            SimulationStatus.PAUSED -> "Paused"
+                            SimulationStatus.IDLE -> "Idle"
+                            SimulationStatus.STEPPING -> "Step"
+                        }
+                        val statusIcon = when (simState.status) {
+                            SimulationStatus.RUNNING -> Icons.Default.Pause
+                            SimulationStatus.PAUSED -> Icons.Default.PlayArrow
+                            SimulationStatus.IDLE -> Icons.Default.PlayArrow
+                            SimulationStatus.STEPPING -> Icons.Default.SkipNext
                         }
                         val targetStatusColor = when (simState.status) {
                             SimulationStatus.RUNNING -> MaterialTheme.colorScheme.primary
@@ -580,8 +604,21 @@ fun MainScreen() {
                             label = "status-color"
                         )
                         AssistChip(
-                            onClick = {},
+                            onClick = { togglePlayPause() },
                             label = { Text(statusText) },
+                            leadingIcon = {
+                                Crossfade(
+                                    targetState = statusIcon,
+                                    label = "status-icon"
+                                ) { icon ->
+                                    Icon(
+                                        icon,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(18.dp),
+                                        tint = statusColor
+                                    )
+                                }
+                            },
                             colors = AssistChipDefaults.assistChipColors(
                                 containerColor = statusColor.copy(alpha = 0.12f),
                                 labelColor = statusColor
@@ -670,6 +707,15 @@ fun MainScreen() {
                     colors = TopAppBarDefaults.topAppBarColors(
                         containerColor = MaterialTheme.colorScheme.surface
                     )
+                )
+            },
+            bottomBar = {
+                StatusBar(
+                    simState = simState,
+                    gridWidth = gridWidth,
+                    gridHeight = gridHeight,
+                    ruleName = rules.getOrNull(selectedRuleIndex)?.displayName ?: "None",
+                    drawMode = drawMode
                 )
             },
             floatingActionButton = {
@@ -765,21 +811,36 @@ fun MainScreen() {
                             .fillMaxWidth()
                             .background(MaterialTheme.colorScheme.surface)
                     ) {
-                        SimulationCanvas(
-                            cellColors = cellColors,
-                            gridWidth = gridWidth,
-                            gridHeight = gridHeight,
-                            gridVisible = gridVisible,
-                            fitToWindowTrigger = fitToWindowTrigger,
-                            drawMode = drawMode,
-                            onCellToggle = { col, row -> engine.toggleCell(row, col) },
-                            onCellPaint = { col, row ->
-                                val numStates = (rules.getOrNull(selectedRuleIndex) as? IntegerRule)?.numStates ?: 2
-                                engine.paintCell(row, col, numStates - 1)
-                            },
-                            onPaintFinished = { engine.flushPaint() },
-                            modifier = Modifier.fillMaxSize().alpha(canvasAlpha)
-                        )
+                        if (selectedLatticeType.is3D) {
+                            val numStates = (currentRule as? IntegerRule)?.numStates
+                                ?: (rules.getOrNull(selectedRuleIndex) as? IntegerRule)?.numStates
+                                ?: 2
+                            VoxelCanvas(
+                                cellColors = cellColors,
+                                cellStates = cellStates,
+                                gridWidth = gridWidth,
+                                gridHeight = gridHeight,
+                                gridDepth = gridDepth,
+                                numStates = numStates,
+                                modifier = Modifier.fillMaxSize().alpha(canvasAlpha)
+                            )
+                        } else {
+                            SimulationCanvas(
+                                cellColors = cellColors,
+                                gridWidth = gridWidth,
+                                gridHeight = gridHeight,
+                                gridVisible = gridVisible,
+                                fitToWindowTrigger = fitToWindowTrigger,
+                                drawMode = drawMode,
+                                onCellToggle = { col, row -> engine.toggleCell(row, col) },
+                                onCellPaint = { col, row ->
+                                    val numStates = (rules.getOrNull(selectedRuleIndex) as? IntegerRule)?.numStates ?: 2
+                                    engine.paintCell(row, col, numStates - 1)
+                                },
+                                onPaintFinished = { engine.flushPaint() },
+                                modifier = Modifier.fillMaxSize().alpha(canvasAlpha)
+                            )
+                        }
 
                         // Rule selector chip
                         ElevatedFilterChip(
@@ -801,15 +862,6 @@ fun MainScreen() {
                             modifier = Modifier.align(Alignment.BottomStart).padding(16.dp)
                         )
                     }
-
-                    // Bottom Status Bar
-                    StatusBar(
-                        simState = simState,
-                        gridWidth = gridWidth,
-                        gridHeight = gridHeight,
-                        ruleName = currentRuleName,
-                        drawMode = drawMode
-                    )
                 }
 
                 // Side panel with animated visibility
@@ -828,6 +880,8 @@ fun MainScreen() {
                                 gridWidth = gridWidth,
                                 gridHeight = gridHeight,
                                 onGridSizeChanged = { w, h -> gridWidth = w; gridHeight = h },
+                                gridDepth = gridDepth,
+                                onGridDepthChanged = { gridDepth = it },
                                 colorSchemes = colorSchemes,
                                 selectedColorSchemeIndex = selectedColorSchemeIndex,
                                 onColorSchemeChanged = { selectedColorSchemeIndex = it },
@@ -839,6 +893,8 @@ fun MainScreen() {
                                 onInitPatternChanged = { initPattern = it },
                                 selectedLatticeType = selectedLatticeType,
                                 onLatticeTypeChanged = { selectedLatticeType = it },
+                                selectedPalette = selectedPalette,
+                                onPaletteChanged = onPaletteChanged,
                                 currentRule = currentRule,
                                 onRuleChanged = { newRule ->
                                     currentRule = newRule

@@ -35,6 +35,9 @@ interface Lattice {
     /** Number of columns. */
     val width: Int
 
+    /** Number of layers (1 for 1D/2D lattices). */
+    val depth: Int get() = 1
+
     /** Total number of cells. */
     val cellCount: Int get() = cells.size
 
@@ -72,6 +75,9 @@ interface Lattice {
 
     /** Whether this is a 1D lattice. */
     val isOneDimensional: Boolean get() = height == 1
+
+    /** Whether this is a 3D lattice. */
+    val isThreeDimensional: Boolean get() = depth > 1
 
     /** Maximum recommended number of neighbors (safety limit). */
     companion object {
@@ -156,5 +162,77 @@ abstract class OneDimensionalLattice(
             col >= width -> (2 * width - col - 2).coerceAtLeast(0)
             else -> col
         }
+    }
+}
+
+/**
+ * A 3D lattice base class with cells stored in layer-major, row-major order:
+ * index = layer * (width * height) + row * width + col
+ */
+abstract class ThreeDimensionalLattice(
+    override val width: Int,
+    override val height: Int,
+    override val depth: Int,
+    override val boundaryCondition: BoundaryCondition = BoundaryCondition.WRAP_AROUND
+) : Lattice {
+
+    private val sliceSize: Int = width * height
+
+    override fun getCell(row: Int, col: Int): Cell? {
+        if (row < 0 || row >= height || col < 0 || col >= width) return null
+        return cells[row * width + col]
+    }
+
+    fun getCell(row: Int, col: Int, layer: Int): Cell? {
+        if (row < 0 || row >= height || col < 0 || col >= width || layer < 0 || layer >= depth) return null
+        return cells[layer * sliceSize + row * width + col]
+    }
+
+    override fun indexToCoordinate(index: Int): Coordinate {
+        val layer = index / sliceSize
+        val remainder = index % sliceSize
+        return Coordinate(remainder / width, remainder % width, layer)
+    }
+
+    override fun coordinateToIndex(row: Int, col: Int): Int = row * width + col
+
+    fun coordinateToIndex(row: Int, col: Int, layer: Int): Int =
+        layer * sliceSize + row * width + col
+
+    protected fun wrapRow(row: Int): Int = ((row % height) + height) % height
+    protected fun wrapCol(col: Int): Int = ((col % width) + width) % width
+    protected fun wrapLayer(layer: Int): Int = ((layer % depth) + depth) % depth
+
+    protected fun reflectRow(row: Int): Int = when {
+        row < 0 -> (-row).coerceAtMost(height - 1)
+        row >= height -> (2 * height - row - 2).coerceAtLeast(0)
+        else -> row
+    }
+
+    protected fun reflectCol(col: Int): Int = when {
+        col < 0 -> (-col).coerceAtMost(width - 1)
+        col >= width -> (2 * width - col - 2).coerceAtLeast(0)
+        else -> col
+    }
+
+    protected fun reflectLayer(layer: Int): Int = when {
+        layer < 0 -> (-layer).coerceAtMost(depth - 1)
+        layer >= depth -> (2 * depth - layer - 2).coerceAtLeast(0)
+        else -> layer
+    }
+
+    protected fun resolveRow(row: Int): Int = when (boundaryCondition) {
+        BoundaryCondition.WRAP_AROUND -> wrapRow(row)
+        BoundaryCondition.REFLECTION -> reflectRow(row)
+    }
+
+    protected fun resolveCol(col: Int): Int = when (boundaryCondition) {
+        BoundaryCondition.WRAP_AROUND -> wrapCol(col)
+        BoundaryCondition.REFLECTION -> reflectCol(col)
+    }
+
+    protected fun resolveLayer(layer: Int): Int = when (boundaryCondition) {
+        BoundaryCondition.WRAP_AROUND -> wrapLayer(layer)
+        BoundaryCondition.REFLECTION -> reflectLayer(layer)
     }
 }

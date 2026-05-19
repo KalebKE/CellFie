@@ -12,9 +12,11 @@ expect object AppSettings {
 object SettingsKeys {
     const val GRID_WIDTH = "grid_width"
     const val GRID_HEIGHT = "grid_height"
+    const val GRID_DEPTH = "grid_depth"
     const val DARK_THEME = "dark_theme"
     const val LAST_RULE_INDEX = "last_rule_index"
     const val LAST_COLOR_SCHEME = "last_color_scheme"
     const val SPEED_INDEX = "speed_index"
     const val LATTICE_TYPE = "lattice_type"
+    const val APP_PALETTE = "app_palette"
 }

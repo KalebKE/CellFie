@@ -65,6 +65,10 @@ class SimulationEngine {
     /** The current RGB color for each cell, updated every N generations. */
     val cellColors: StateFlow<IntArray> = _cellColors.asStateFlow()
 
+    private val _cellStates = MutableStateFlow(IntArray(0))
+    /** Raw integer state values for each cell (used by the 3D renderer). */
+    val cellStates: StateFlow<IntArray> = _cellStates.asStateFlow()
+
     private val _delayMs = MutableStateFlow(0L)
 
     @Volatile
@@ -78,8 +82,19 @@ class SimulationEngine {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
-    // Reusable color buffer to reduce GC pressure
-    private var colorBuffer: IntArray = IntArray(0)
+    // Double-buffered color arrays: alternating references so StateFlow
+    // always sees a new identity and emits updates to the UI.
+    private var colorBufferA: IntArray = IntArray(0)
+    private var colorBufferB: IntArray = IntArray(0)
+    private var useBufferA = true
+
+    // Double-buffered state arrays for the 3D renderer
+    private var stateBufferA: IntArray = IntArray(0)
+    private var stateBufferB: IntArray = IntArray(0)
+    private var useStateBufferA = true
+
+    /** Whether the current lattice is three-dimensional. */
+    val is3D: Boolean get() = _config?.lattice?.isThreeDimensional == true
 
     // Batch painting support
     @Volatile
@@ -336,25 +351,35 @@ class SimulationEngine {
     /**
      * Build the color buffer from current cell states.
      * Reuses the existing buffer if the size matches to reduce GC pressure.
+     * Also emits raw state values for the 3D renderer.
      */
     private fun updateColorBuffer(cfg: SimulationConfig) {
         val cells = cfg.lattice.cells
         val scheme = activeColorScheme ?: cfg.colorScheme
         val numStates = (cfg.rule as? IntegerRule)?.numStates ?: 2
 
-        if (colorBuffer.size != cells.size) {
-            colorBuffer = IntArray(cells.size)
+        if (colorBufferA.size != cells.size) {
+            colorBufferA = IntArray(cells.size)
+            colorBufferB = IntArray(cells.size)
+            stateBufferA = IntArray(cells.size)
+            stateBufferB = IntArray(cells.size)
         }
 
+        val colorBuf = if (useBufferA) colorBufferA else colorBufferB
+        val stateBuf = if (useStateBufferA) stateBufferA else stateBufferB
         for (i in cells.indices) {
             val state = cells[i].currentState.toInt()
+            stateBuf[i] = state
             val color = scheme.getColor(state, numStates)
             val r = (color.red * 255).toInt()
             val g = (color.green * 255).toInt()
             val b = (color.blue * 255).toInt()
-            colorBuffer[i] = (0xFF shl 24) or (r shl 16) or (g shl 8) or b
+            colorBuf[i] = (0xFF shl 24) or (r shl 16) or (g shl 8) or b
         }
-        _cellColors.value = colorBuffer
+        _cellColors.value = colorBuf
+        _cellStates.value = stateBuf
+        useBufferA = !useBufferA
+        useStateBufferA = !useStateBufferA
     }
 }
 
