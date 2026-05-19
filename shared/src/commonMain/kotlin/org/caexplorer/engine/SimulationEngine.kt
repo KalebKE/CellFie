@@ -96,6 +96,19 @@ class SimulationEngine {
     /** Whether the current lattice is three-dimensional. */
     val is3D: Boolean get() = _config?.lattice?.isThreeDimensional == true
 
+    // --- Artistic render effects ---
+    @Volatile var trailEnabled: Boolean = false
+    @Volatile var trailDecay: Float = 0.92f
+
+    @Volatile var bloomEnabled: Boolean = false
+    @Volatile var bloomRadius: Int = 3
+    @Volatile var bloomIntensity: Float = 0.6f
+
+    @Volatile var smoothEnabled: Boolean = false
+
+    // Trail intensity buffer — persists across generations
+    private var trailBuffer: FloatArray = FloatArray(0)
+
     // Batch painting support
     @Volatile
     private var pendingColorUpdate = false
@@ -107,6 +120,7 @@ class SimulationEngine {
         stop()
         this._config = config
         activeColorScheme = config.colorScheme
+        trailBuffer = FloatArray(0) // reset trails on new config
         _state.value = SimulationState(status = SimulationStatus.IDLE, generation = 0)
         updateColorBuffer(config)
     }
@@ -350,36 +364,142 @@ class SimulationEngine {
 
     /**
      * Build the color buffer from current cell states.
-     * Reuses the existing buffer if the size matches to reduce GC pressure.
+     * Applies artistic render effects: trail decay, bloom/glow.
      * Also emits raw state values for the 3D renderer.
      */
     private fun updateColorBuffer(cfg: SimulationConfig) {
         val cells = cfg.lattice.cells
         val scheme = activeColorScheme ?: cfg.colorScheme
         val numStates = (cfg.rule as? IntegerRule)?.numStates ?: 2
+        val cellCount = cells.size
+        val width = cfg.lattice.width
+        val height = cfg.lattice.height
 
-        if (colorBufferA.size != cells.size) {
-            colorBufferA = IntArray(cells.size)
-            colorBufferB = IntArray(cells.size)
-            stateBufferA = IntArray(cells.size)
-            stateBufferB = IntArray(cells.size)
+        if (colorBufferA.size != cellCount) {
+            colorBufferA = IntArray(cellCount)
+            colorBufferB = IntArray(cellCount)
+            stateBufferA = IntArray(cellCount)
+            stateBufferB = IntArray(cellCount)
         }
+
+        // --- Trail decay: maintain a persistent intensity per cell ---
+        val useTrail = trailEnabled
+        if (useTrail && trailBuffer.size != cellCount) {
+            trailBuffer = FloatArray(cellCount)
+        }
+        val decay = trailDecay
 
         val colorBuf = if (useBufferA) colorBufferA else colorBufferB
         val stateBuf = if (useStateBufferA) stateBufferA else stateBufferB
+
         for (i in cells.indices) {
             val state = cells[i].currentState.toInt()
             stateBuf[i] = state
-            val color = scheme.getColor(state, numStates)
-            val r = (color.red * 255).toInt()
-            val g = (color.green * 255).toInt()
-            val b = (color.blue * 255).toInt()
-            colorBuf[i] = (0xFF shl 24) or (r shl 16) or (g shl 8) or b
+
+            if (useTrail) {
+                // Active cells → full intensity; dead cells decay
+                val liveIntensity = if (numStates <= 2) {
+                    if (state > 0) 1f else 0f
+                } else {
+                    state.toFloat() / (numStates - 1).toFloat()
+                }
+
+                if (liveIntensity > trailBuffer[i]) {
+                    trailBuffer[i] = liveIntensity
+                } else {
+                    trailBuffer[i] *= decay
+                    if (trailBuffer[i] < 0.005f) trailBuffer[i] = 0f
+                }
+
+                val intensity = trailBuffer[i]
+                val color = scheme.getColor(intensity.toDouble())
+                val r = (color.red * 255).toInt()
+                val g = (color.green * 255).toInt()
+                val b = (color.blue * 255).toInt()
+                colorBuf[i] = (0xFF shl 24) or (r shl 16) or (g shl 8) or b
+            } else {
+                val color = scheme.getColor(state, numStates)
+                val r = (color.red * 255).toInt()
+                val g = (color.green * 255).toInt()
+                val b = (color.blue * 255).toInt()
+                colorBuf[i] = (0xFF shl 24) or (r shl 16) or (g shl 8) or b
+            }
         }
+
+        // --- Bloom/glow post-processing ---
+        if (bloomEnabled && width > 0 && height > 0 && !cfg.lattice.isThreeDimensional) {
+            applyBloom(colorBuf, width, height, bloomRadius, bloomIntensity)
+        }
+
         _cellColors.value = colorBuf
         _cellStates.value = stateBuf
         useBufferA = !useBufferA
         useStateBufferA = !useStateBufferA
+    }
+
+    /**
+     * Apply a box-blur bloom effect to the color buffer.
+     * Blurs the image, then additively composites the blur on top.
+     */
+    private fun applyBloom(buf: IntArray, width: Int, height: Int, radius: Int, intensity: Float) {
+        val size = width * height
+        if (buf.size < size) return
+        val blurR = FloatArray(size)
+        val blurG = FloatArray(size)
+        val blurB = FloatArray(size)
+
+        // Horizontal blur pass
+        val tempR = FloatArray(size)
+        val tempG = FloatArray(size)
+        val tempB = FloatArray(size)
+        val kernelSize = (radius * 2 + 1).toFloat()
+
+        for (row in 0 until height) {
+            val rowOff = row * width
+            for (col in 0 until width) {
+                var rSum = 0f; var gSum = 0f; var bSum = 0f
+                for (dx in -radius..radius) {
+                    val c = (col + dx).coerceIn(0, width - 1)
+                    val pixel = buf[rowOff + c]
+                    rSum += ((pixel shr 16) and 0xFF).toFloat()
+                    gSum += ((pixel shr 8) and 0xFF).toFloat()
+                    bSum += (pixel and 0xFF).toFloat()
+                }
+                val idx = rowOff + col
+                tempR[idx] = rSum / kernelSize
+                tempG[idx] = gSum / kernelSize
+                tempB[idx] = bSum / kernelSize
+            }
+        }
+
+        // Vertical blur pass
+        for (col in 0 until width) {
+            for (row in 0 until height) {
+                var rSum = 0f; var gSum = 0f; var bSum = 0f
+                for (dy in -radius..radius) {
+                    val r = (row + dy).coerceIn(0, height - 1)
+                    val idx = r * width + col
+                    rSum += tempR[idx]
+                    gSum += tempG[idx]
+                    bSum += tempB[idx]
+                }
+                val idx = row * width + col
+                blurR[idx] = rSum / kernelSize
+                blurG[idx] = gSum / kernelSize
+                blurB[idx] = bSum / kernelSize
+            }
+        }
+
+        // Additive composite: original + blur * intensity
+        for (i in 0 until size) {
+            val origR = ((buf[i] shr 16) and 0xFF).toFloat()
+            val origG = ((buf[i] shr 8) and 0xFF).toFloat()
+            val origB = (buf[i] and 0xFF).toFloat()
+            val r = (origR + blurR[i] * intensity).coerceAtMost(255f).toInt()
+            val g = (origG + blurG[i] * intensity).coerceAtMost(255f).toInt()
+            val b = (origB + blurB[i] * intensity).coerceAtMost(255f).toInt()
+            buf[i] = (0xFF shl 24) or (r shl 16) or (g shl 8) or b
+        }
     }
 }
 

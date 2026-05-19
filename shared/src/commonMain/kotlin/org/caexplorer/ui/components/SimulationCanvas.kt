@@ -40,6 +40,7 @@ fun SimulationCanvas(
     gridVisible: Boolean = false,
     fitToWindowTrigger: Int = 0,
     drawMode: Boolean = false,
+    smoothInterpolation: Boolean = false,
     onCellToggle: ((col: Int, row: Int) -> Unit)? = null,
     onCellPaint: ((col: Int, row: Int) -> Unit)? = null,
     onPaintFinished: (() -> Unit)? = null,
@@ -177,7 +178,7 @@ fun SimulationCanvas(
                 gridPixelWidth.toInt().coerceAtLeast(1),
                 gridPixelHeight.toInt().coerceAtLeast(1)
             ),
-            filterQuality = FilterQuality.None // Nearest-neighbor for crisp cells
+            filterQuality = if (smoothInterpolation) FilterQuality.Medium else FilterQuality.None
         )
 
         // Draw grid overlay when zoomed in sufficiently

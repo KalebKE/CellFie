@@ -141,6 +141,13 @@ fun MainScreen(
     // Track status before entering draw mode so we can restore it
     var statusBeforeDrawMode by remember { mutableStateOf<SimulationStatus?>(null) }
 
+    // Artistic render effects
+    var trailEnabled by remember { mutableStateOf(false) }
+    var trailDecay by remember { mutableStateOf(0.92f) }
+    var bloomEnabled by remember { mutableStateOf(false) }
+    var bloomIntensity by remember { mutableStateOf(0.6f) }
+    var smoothEnabled by remember { mutableStateOf(false) }
+
     // GIF recording
     val gifRecorder = remember { GifRecorder() }
     var gifRecording by remember { mutableStateOf(false) }
@@ -168,6 +175,15 @@ fun MainScreen(
     // Propagate color scheme changes (without reinitializing simulation)
     LaunchedEffect(selectedColorSchemeIndex) {
         engine.updateColorScheme(colorSchemes[selectedColorSchemeIndex])
+    }
+
+    // Propagate render effect changes to engine
+    LaunchedEffect(trailEnabled, trailDecay, bloomEnabled, bloomIntensity, smoothEnabled) {
+        engine.trailEnabled = trailEnabled
+        engine.trailDecay = trailDecay
+        engine.bloomEnabled = bloomEnabled
+        engine.bloomIntensity = bloomIntensity
+        engine.smoothEnabled = smoothEnabled
     }
 
     // Run analyses when panel is visible and generation changes
@@ -832,6 +848,7 @@ fun MainScreen(
                                 gridVisible = gridVisible,
                                 fitToWindowTrigger = fitToWindowTrigger,
                                 drawMode = drawMode,
+                                smoothInterpolation = smoothEnabled,
                                 onCellToggle = { col, row -> engine.toggleCell(row, col) },
                                 onCellPaint = { col, row ->
                                     val numStates = (rules.getOrNull(selectedRuleIndex) as? IntegerRule)?.numStates ?: 2
@@ -901,7 +918,17 @@ fun MainScreen(
                                     resetKey++
                                 },
                                 onResetSimulation = { engine.stop(); resetKey++ },
-                                onDismiss = { showConfig = false }
+                                onDismiss = { showConfig = false },
+                                trailEnabled = trailEnabled,
+                                onTrailEnabledChanged = { trailEnabled = it },
+                                trailDecay = trailDecay,
+                                onTrailDecayChanged = { trailDecay = it },
+                                bloomEnabled = bloomEnabled,
+                                onBloomEnabledChanged = { bloomEnabled = it },
+                                bloomIntensity = bloomIntensity,
+                                onBloomIntensityChanged = { bloomIntensity = it },
+                                smoothEnabled = smoothEnabled,
+                                onSmoothEnabledChanged = { smoothEnabled = it }
                             )
                         }
                     }

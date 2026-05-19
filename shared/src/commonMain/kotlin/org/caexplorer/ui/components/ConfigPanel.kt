@@ -80,6 +80,16 @@ fun ConfigPanel(
     onRuleChanged: ((Rule) -> Unit)? = null,
     onResetSimulation: () -> Unit,
     onDismiss: () -> Unit,
+    trailEnabled: Boolean = false,
+    onTrailEnabledChanged: (Boolean) -> Unit = {},
+    trailDecay: Float = 0.92f,
+    onTrailDecayChanged: (Float) -> Unit = {},
+    bloomEnabled: Boolean = false,
+    onBloomEnabledChanged: (Boolean) -> Unit = {},
+    bloomIntensity: Float = 0.6f,
+    onBloomIntensityChanged: (Float) -> Unit = {},
+    smoothEnabled: Boolean = false,
+    onSmoothEnabledChanged: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var widthSlider by remember(gridWidth) { mutableStateOf(gridWidth.toFloat()) }
@@ -93,6 +103,7 @@ fun ConfigPanel(
     var initPatternExpanded by remember { mutableStateOf(true) }
     var gridSizeExpanded by remember { mutableStateOf(true) }
     var rulePropsExpanded by remember { mutableStateOf(true) }
+    var renderFxExpanded by remember { mutableStateOf(true) }
 
     Column(
         modifier = modifier
@@ -297,6 +308,124 @@ fun ConfigPanel(
                             }
                         )
                     }
+                }
+            }
+        }
+
+        HorizontalDivider()
+
+        // --- Render FX ---
+        SectionHeader("Render FX", renderFxExpanded) { renderFxExpanded = !renderFxExpanded }
+        AnimatedVisibility(
+            visible = renderFxExpanded,
+            enter = expandVertically(),
+            exit = shrinkVertically()
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                // Trail/Fade toggle + decay slider
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Trail / Fade", style = MaterialTheme.typography.bodySmall)
+                    Switch(
+                        checked = trailEnabled,
+                        onCheckedChange = onTrailEnabledChanged,
+                        modifier = Modifier.height(24.dp)
+                    )
+                }
+                if (trailEnabled) {
+                    Text(
+                        "Trail length: ${((1f - trailDecay) * 100).roundToInt()}% decay",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Slider(
+                        value = trailDecay,
+                        onValueChange = onTrailDecayChanged,
+                        valueRange = 0.80f..0.99f
+                    )
+                }
+
+                // Bloom/Glow toggle + intensity slider
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Bloom / Glow", style = MaterialTheme.typography.bodySmall)
+                    Switch(
+                        checked = bloomEnabled,
+                        onCheckedChange = onBloomEnabledChanged,
+                        modifier = Modifier.height(24.dp)
+                    )
+                }
+                if (bloomEnabled) {
+                    Text(
+                        "Intensity: ${(bloomIntensity * 100).roundToInt()}%",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Slider(
+                        value = bloomIntensity,
+                        onValueChange = onBloomIntensityChanged,
+                        valueRange = 0.1f..1.5f
+                    )
+                }
+
+                // Smooth interpolation toggle
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Smooth / Painterly", style = MaterialTheme.typography.bodySmall)
+                    Switch(
+                        checked = smoothEnabled,
+                        onCheckedChange = onSmoothEnabledChanged,
+                        modifier = Modifier.height(24.dp)
+                    )
+                }
+
+                // Preset combos
+                Text(
+                    "Presets",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    SuggestionChip(
+                        onClick = {
+                            onTrailEnabledChanged(true)
+                            onTrailDecayChanged(0.94f)
+                            onBloomEnabledChanged(true)
+                            onBloomIntensityChanged(0.8f)
+                            onSmoothEnabledChanged(true)
+                        },
+                        label = { Text("Ethereal") }
+                    )
+                    SuggestionChip(
+                        onClick = {
+                            onTrailEnabledChanged(true)
+                            onTrailDecayChanged(0.88f)
+                            onBloomEnabledChanged(true)
+                            onBloomIntensityChanged(1.2f)
+                            onSmoothEnabledChanged(false)
+                        },
+                        label = { Text("Neon") }
+                    )
+                    SuggestionChip(
+                        onClick = {
+                            onTrailEnabledChanged(false)
+                            onBloomEnabledChanged(false)
+                            onSmoothEnabledChanged(false)
+                        },
+                        label = { Text("Classic") }
+                    )
                 }
             }
         }
