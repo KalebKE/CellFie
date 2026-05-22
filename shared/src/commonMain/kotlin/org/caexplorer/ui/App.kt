@@ -2,12 +2,12 @@ package org.caexplorer.ui
 
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import org.caexplorer.data.AppSettings
+import org.caexplorer.data.SettingsKeys
 import org.caexplorer.ui.screens.MainScreen
+import org.caexplorer.ui.theme.AppPalette
 import org.caexplorer.ui.theme.CAExplorerTheme
 
 /**
@@ -68,9 +68,22 @@ object AppActions {
 
 @Composable
 fun App() {
-    CAExplorerTheme {
+    val savedPaletteName = AppSettings.getString(SettingsKeys.APP_PALETTE, AppPalette.FIRE.name)
+    var palette by remember {
+        mutableStateOf(
+            AppPalette.entries.find { it.name == savedPaletteName } ?: AppPalette.FIRE
+        )
+    }
+
+    CAExplorerTheme(palette = palette) {
         Surface(modifier = Modifier.fillMaxSize()) {
-            MainScreen()
+            MainScreen(
+                selectedPalette = palette,
+                onPaletteChanged = { newPalette ->
+                    palette = newPalette
+                    AppSettings.putString(SettingsKeys.APP_PALETTE, newPalette.name)
+                }
+            )
         }
     }
 }

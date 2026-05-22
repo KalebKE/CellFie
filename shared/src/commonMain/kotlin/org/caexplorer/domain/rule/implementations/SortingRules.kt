@@ -4,7 +4,9 @@ import org.caexplorer.domain.cell.Cell
 import org.caexplorer.domain.cellstate.CellState
 import org.caexplorer.domain.cellstate.IntegerCellState
 import org.caexplorer.domain.rule.IntegerRule
+import org.caexplorer.domain.rule.Rule
 import org.caexplorer.domain.rule.RuleCategory
+import org.caexplorer.domain.rule.RuleProperty
 import kotlin.math.roundToInt
 import kotlin.random.Random
 
@@ -32,6 +34,14 @@ class IntegerAverage(override val numStates: Int = 10) : IntegerRule() {
     }
 
     override fun createInitialState(): CellState = IntegerCellState(0)
+
+    override val properties get() = listOf(
+        RuleProperty.IntProperty("numStates", "States", numStates, 2, 256, "Number of cell states")
+    )
+    override fun withProperty(key: String, value: Any): Rule = when (key) {
+        "numStates" -> IntegerAverage((value as Number).toInt().coerceIn(2, 256))
+        else -> this
+    }
 }
 
 // =============================================================================
@@ -73,6 +83,14 @@ class IntegerSort(override val numStates: Int = 10) : IntegerRule() {
     }
 
     override fun createInitialState(): CellState = IntegerCellState(0)
+
+    override val properties get() = listOf(
+        RuleProperty.IntProperty("numStates", "States", numStates, 2, 256, "Number of cell states")
+    )
+    override fun withProperty(key: String, value: Any): Rule = when (key) {
+        "numStates" -> IntegerSort((value as Number).toInt().coerceIn(2, 256))
+        else -> this
+    }
 }
 
 // =============================================================================
@@ -98,6 +116,14 @@ class CopyRandomNeighbor(override val numStates: Int = 10) : IntegerRule() {
     }
 
     override fun createInitialState(): CellState = IntegerCellState(0)
+
+    override val properties get() = listOf(
+        RuleProperty.IntProperty("numStates", "States", numStates, 2, 256, "Number of cell states")
+    )
+    override fun withProperty(key: String, value: Any): Rule = when (key) {
+        "numStates" -> CopyRandomNeighbor((value as Number).toInt().coerceIn(2, 256))
+        else -> this
+    }
 }
 
 // =============================================================================
@@ -122,4 +148,12 @@ class SumModuloN(override val numStates: Int = 8) : IntegerRule() {
     }
 
     override fun createInitialState(): CellState = IntegerCellState(0)
+
+    override val properties get() = listOf(
+        RuleProperty.IntProperty("numStates", "States", numStates, 2, 256, "Number of cell states")
+    )
+    override fun withProperty(key: String, value: Any): Rule = when (key) {
+        "numStates" -> SumModuloN((value as Number).toInt().coerceIn(2, 256))
+        else -> this
+    }
 }

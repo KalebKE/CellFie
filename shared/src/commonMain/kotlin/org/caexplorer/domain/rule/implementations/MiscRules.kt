@@ -4,7 +4,9 @@ import org.caexplorer.domain.cell.Cell
 import org.caexplorer.domain.cellstate.CellState
 import org.caexplorer.domain.cellstate.IntegerCellState
 import org.caexplorer.domain.rule.IntegerRule
+import org.caexplorer.domain.rule.Rule
 import org.caexplorer.domain.rule.RuleCategory
+import org.caexplorer.domain.rule.RuleProperty
 import kotlin.math.pow
 import kotlin.random.Random
 
@@ -29,6 +31,14 @@ class RandomUpdate(override val numStates: Int = 8) : IntegerRule() {
     }
 
     override fun createInitialState(): CellState = IntegerCellState(0)
+
+    override val properties get() = listOf(
+        RuleProperty.IntProperty("numStates", "States", numStates, 2, 256, "Number of cell states")
+    )
+    override fun withProperty(key: String, value: Any): Rule = when (key) {
+        "numStates" -> RandomUpdate((value as Number).toInt().coerceIn(2, 256))
+        else -> this
+    }
 }
 
 // =============================================================================
@@ -123,6 +133,16 @@ class LangtonLambda(
     }
 
     override fun createInitialState(): CellState = IntegerCellState(0)
+
+    override val properties get() = listOf(
+        RuleProperty.IntProperty("numStates", "States", numStates, 2, 64, "Number of cell states"),
+        RuleProperty.FloatProperty("lambda", "Lambda (λ)", lambda.toFloat(), 0.0f, 1.0f, "Fraction of non-quiescent transitions")
+    )
+    override fun withProperty(key: String, value: Any): Rule = when (key) {
+        "numStates" -> LangtonLambda((value as Number).toInt().coerceIn(2, 64), lambda)
+        "lambda" -> LangtonLambda(numStates, (value as Number).toDouble().coerceIn(0.0, 1.0))
+        else -> this
+    }
 
     companion object {
         private const val MAX_TABLE_SIZE = 100000

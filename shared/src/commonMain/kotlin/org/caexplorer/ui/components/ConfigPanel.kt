@@ -90,6 +90,16 @@ fun ConfigPanel(
     onBloomIntensityChanged: (Float) -> Unit = {},
     smoothEnabled: Boolean = false,
     onSmoothEnabledChanged: (Boolean) -> Unit = {},
+    voxelOpacity: Float = 0.8f,
+    onVoxelOpacityChanged: (Float) -> Unit = {},
+    depthFadeEnabled: Boolean = false,
+    onDepthFadeEnabledChanged: (Boolean) -> Unit = {},
+    depthFadeReversed: Boolean = false,
+    onDepthFadeReversedChanged: (Boolean) -> Unit = {},
+    layerMin: Int = 0,
+    onLayerMinChanged: (Int) -> Unit = {},
+    layerMax: Int = Int.MAX_VALUE,
+    onLayerMaxChanged: (Int) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var widthSlider by remember(gridWidth) { mutableStateOf(gridWidth.toFloat()) }
@@ -104,6 +114,7 @@ fun ConfigPanel(
     var gridSizeExpanded by remember { mutableStateOf(true) }
     var rulePropsExpanded by remember { mutableStateOf(true) }
     var renderFxExpanded by remember { mutableStateOf(true) }
+    var voxelOpacityExpanded by remember { mutableStateOf(true) }
 
     Column(
         modifier = modifier
@@ -431,6 +442,82 @@ fun ConfigPanel(
         }
 
         HorizontalDivider()
+
+        // --- 3D Opacity (only for 3D lattices) ---
+        if (selectedLatticeType.is3D) {
+            SectionHeader("3D Opacity", voxelOpacityExpanded) { voxelOpacityExpanded = !voxelOpacityExpanded }
+            AnimatedVisibility(
+                visible = voxelOpacityExpanded,
+                enter = expandVertically(),
+                exit = shrinkVertically()
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    // Global opacity slider
+                    Text(
+                        "Opacity: ${(voxelOpacity * 100).roundToInt()}%",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    Slider(
+                        value = voxelOpacity,
+                        onValueChange = onVoxelOpacityChanged,
+                        valueRange = 0.05f..1.0f
+                    )
+
+                    // Depth fade toggle
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("Depth Fade", style = MaterialTheme.typography.bodySmall)
+                        Switch(
+                            checked = depthFadeEnabled,
+                            onCheckedChange = onDepthFadeEnabledChanged,
+                            modifier = Modifier.height(24.dp)
+                        )
+                    }
+
+                    if (depthFadeEnabled) {
+                        // Reverse direction toggle
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                if (depthFadeReversed) "Edges opaque → Center transparent"
+                                else "Center opaque → Edges transparent",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Switch(
+                                checked = depthFadeReversed,
+                                onCheckedChange = onDepthFadeReversedChanged,
+                                modifier = Modifier.height(24.dp)
+                            )
+                        }
+                    }
+
+                    // Layer slice
+                    val effectiveMax = (gridDepth - 1).coerceAtLeast(1)
+                    Text(
+                        "Layer Slice: ${layerMin}–${layerMax.coerceAtMost(effectiveMax)}",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    RangeSlider(
+                        value = layerMin.toFloat()..layerMax.coerceAtMost(effectiveMax).toFloat(),
+                        onValueChange = { range ->
+                            onLayerMinChanged(range.start.roundToInt())
+                            onLayerMaxChanged(range.endInclusive.roundToInt())
+                        },
+                        valueRange = 0f..effectiveMax.toFloat(),
+                        steps = (effectiveMax - 1).coerceAtLeast(0)
+                    )
+                }
+            }
+
+            HorizontalDivider()
+        }
 
         // --- Grid Size ---
         SectionHeader("Grid Size", gridSizeExpanded) { gridSizeExpanded = !gridSizeExpanded }

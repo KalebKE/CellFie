@@ -7,7 +7,9 @@ import org.caexplorer.domain.cellstate.RealValuedState
 import org.caexplorer.domain.rule.BinaryRule
 import org.caexplorer.domain.rule.IntegerRule
 import org.caexplorer.domain.rule.RealRule
+import org.caexplorer.domain.rule.Rule
 import org.caexplorer.domain.rule.RuleCategory
+import org.caexplorer.domain.rule.RuleProperty
 import kotlin.math.E
 import kotlin.math.floor
 import kotlin.math.pow
@@ -267,6 +269,16 @@ class ObesityModel(
     }
 
     override fun createInitialState(): CellState = IntegerCellState(0)
+
+    override val properties get() = listOf(
+        RuleProperty.IntProperty("numStates", "States", numStates, 2, 64, "Number of cell states"),
+        RuleProperty.FloatProperty("socialTemperature", "Temperature", socialTemperature.toFloat(), 0.1f, 10.0f, "Social influence temperature")
+    )
+    override fun withProperty(key: String, value: Any): Rule = when (key) {
+        "numStates" -> ObesityModel((value as Number).toInt().coerceIn(2, 64), socialTemperature)
+        "socialTemperature" -> ObesityModel(numStates, (value as Number).toDouble().coerceIn(0.1, 10.0))
+        else -> this
+    }
 }
 
 // =============================================================================

@@ -43,16 +43,23 @@ fun VoxelCanvas(
     gridHeight: Int,
     gridDepth: Int,
     numStates: Int,
+    voxelOpacity: Float = 0.8f,
+    depthFadeEnabled: Boolean = false,
+    depthFadeReversed: Boolean = false,
+    layerMin: Int = 0,
+    layerMax: Int = Int.MAX_VALUE,
     modifier: Modifier = Modifier
 ) {
     val camera = remember { Camera3DState() }
 
-    // Precompute visible voxels when data changes
-    val voxelData = remember(cellStates, gridWidth, gridHeight, gridDepth) {
+    val effectiveLayerMax = layerMax.coerceAtMost(gridDepth - 1)
+
+    // Precompute visible voxels when data or layer range changes
+    val voxelData = remember(cellStates, gridWidth, gridHeight, gridDepth, layerMin, effectiveLayerMax) {
         if (cellStates.isEmpty() || gridWidth <= 0 || gridHeight <= 0 || gridDepth <= 0) {
             emptyList()
         } else {
-            buildVisibleVoxels(cellStates, cellColors, gridWidth, gridHeight, gridDepth)
+            buildVisibleVoxels(cellStates, cellColors, gridWidth, gridHeight, gridDepth, layerMin, effectiveLayerMax)
         }
     }
 
@@ -88,7 +95,10 @@ fun VoxelCanvas(
             gridHeight = gridHeight,
             gridDepth = gridDepth,
             camera = camera,
-            numStates = numStates
+            numStates = numStates,
+            voxelOpacity = voxelOpacity,
+            depthFadeEnabled = depthFadeEnabled,
+            depthFadeReversed = depthFadeReversed
         )
     }
 }
@@ -100,11 +110,14 @@ private data class VoxelInfo(
 
 private fun buildVisibleVoxels(
     states: IntArray, colors: IntArray,
-    w: Int, h: Int, d: Int
+    w: Int, h: Int, d: Int,
+    layerMin: Int = 0, layerMax: Int = d - 1
 ): List<VoxelInfo> {
-    val result = ArrayList<VoxelInfo>(states.size / 4) // estimate ~25% filled
+    val result = ArrayList<VoxelInfo>(states.size / 4)
     val sliceSize = w * h
-    for (layer in 0 until d) {
+    val minL = layerMin.coerceIn(0, d - 1)
+    val maxL = layerMax.coerceIn(0, d - 1)
+    for (layer in minL..maxL) {
         for (row in 0 until h) {
             for (col in 0 until w) {
                 val idx = layer * sliceSize + row * w + col
@@ -122,7 +135,10 @@ private fun DrawScope.drawVoxelScene(
     voxelData: List<VoxelInfo>,
     gridWidth: Int, gridHeight: Int, gridDepth: Int,
     camera: Camera3DState,
-    numStates: Int
+    numStates: Int,
+    voxelOpacity: Float = 0.8f,
+    depthFadeEnabled: Boolean = false,
+    depthFadeReversed: Boolean = false
 ) {
     if (voxelData.isEmpty()) return
 
@@ -228,11 +244,29 @@ private fun DrawScope.drawVoxelScene(
         val r = ((voxel.color shr 16) and 0xFF) / 255f
         val g = ((voxel.color shr 8) and 0xFF) / 255f
         val b = (voxel.color and 0xFF) / 255f
-        val alpha = if (numStates > 2) {
+
+        // Base alpha from state fraction
+        val stateAlpha = if (numStates > 2) {
             0.4f + 0.6f * (voxel.state.toFloat() / (numStates - 1))
         } else {
             1f
         }
+
+        // Depth fade: compute normalized distance from lattice center (0=center, 1=edge)
+        val depthFadeFactor = if (depthFadeEnabled && gridDepth > 1) {
+            val centerX = (gridWidth - 1) / 2f
+            val centerY = (gridHeight - 1) / 2f
+            val centerZ = (gridDepth - 1) / 2f
+            val dx = (voxel.x - centerX) / (gridWidth / 2f).coerceAtLeast(1f)
+            val dy = (voxel.y - centerY) / (gridHeight / 2f).coerceAtLeast(1f)
+            val dz = (voxel.z - centerZ) / (gridDepth / 2f).coerceAtLeast(1f)
+            val dist = sqrt(dx * dx + dy * dy + dz * dz).coerceIn(0f, 1.73f) / 1.73f
+            if (depthFadeReversed) dist else 1f - dist
+        } else {
+            1f
+        }
+
+        val alpha = (stateAlpha * voxelOpacity * depthFadeFactor).coerceIn(0.02f, 1f)
 
         val hs = voxelScreenSize * 0.5f
 

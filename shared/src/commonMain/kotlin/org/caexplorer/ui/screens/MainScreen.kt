@@ -148,6 +148,13 @@ fun MainScreen(
     var bloomIntensity by remember { mutableStateOf(0.6f) }
     var smoothEnabled by remember { mutableStateOf(false) }
 
+    // 3D opacity controls
+    var voxelOpacity by remember { mutableStateOf(0.8f) }
+    var depthFadeEnabled by remember { mutableStateOf(false) }
+    var depthFadeReversed by remember { mutableStateOf(false) }
+    var layerMin by remember { mutableStateOf(0) }
+    var layerMax by remember { mutableStateOf(Int.MAX_VALUE) }
+
     // GIF recording
     val gifRecorder = remember { GifRecorder() }
     var gifRecording by remember { mutableStateOf(false) }
@@ -254,6 +261,10 @@ fun MainScreen(
     }
     // Initialize simulation on rule/grid/reset/lattice changes
     LaunchedEffect(selectedRuleIndex, gridWidth, gridHeight, gridDepth, resetKey, selectedLatticeType) {
+        // Reset layer slice to full range when grid changes
+        layerMin = 0
+        layerMax = gridDepth - 1
+
         val rule = currentRule ?: rules.getOrNull(selectedRuleIndex) ?: return@LaunchedEffect
         val numStates = (rule as? IntegerRule)?.numStates ?: 2
         IntegerCellState.numStates = numStates
@@ -839,6 +850,11 @@ fun MainScreen(
                                 gridHeight = gridHeight,
                                 gridDepth = gridDepth,
                                 numStates = numStates,
+                                voxelOpacity = voxelOpacity,
+                                depthFadeEnabled = depthFadeEnabled,
+                                depthFadeReversed = depthFadeReversed,
+                                layerMin = layerMin,
+                                layerMax = layerMax,
                                 modifier = Modifier.fillMaxSize().alpha(canvasAlpha)
                             )
                         } else {
@@ -929,7 +945,17 @@ fun MainScreen(
                                 bloomIntensity = bloomIntensity,
                                 onBloomIntensityChanged = { bloomIntensity = it },
                                 smoothEnabled = smoothEnabled,
-                                onSmoothEnabledChanged = { smoothEnabled = it }
+                                onSmoothEnabledChanged = { smoothEnabled = it },
+                                voxelOpacity = voxelOpacity,
+                                onVoxelOpacityChanged = { voxelOpacity = it },
+                                depthFadeEnabled = depthFadeEnabled,
+                                onDepthFadeEnabledChanged = { depthFadeEnabled = it },
+                                depthFadeReversed = depthFadeReversed,
+                                onDepthFadeReversedChanged = { depthFadeReversed = it },
+                                layerMin = layerMin,
+                                onLayerMinChanged = { layerMin = it },
+                                layerMax = layerMax,
+                                onLayerMaxChanged = { layerMax = it }
                             )
                         }
                     }

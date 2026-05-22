@@ -199,6 +199,99 @@ class RandomColorScheme : GradientColorScheme(
     }
 }
 
+/**
+ * Multi-stop gradient color scheme. Interpolates through an ordered list of
+ * color stops for rich, themed palettes.
+ */
+open class MultiGradientColorScheme(
+    override val displayName: String,
+    private val stops: List<Color>
+) : GradientColorScheme(
+    emptyColor = stops.first(),
+    filledColor = stops.last()
+) {
+    private var cachedColors: Array<Color>? = null
+    private var cachedNumStates = -1
+
+    @Synchronized
+    override fun getColor(state: Int, numStates: Int): Color {
+        if (numStates <= 1) return emptyColor
+        if (cachedColors == null || cachedNumStates != numStates) {
+            cachedNumStates = numStates
+            cachedColors = Array(numStates) { i ->
+                val t = i.toFloat() / (numStates - 1).toFloat()
+                sampleGradient(t)
+            }
+        }
+        return cachedColors!![state.coerceIn(0, numStates - 1)]
+    }
+
+    private fun sampleGradient(t: Float): Color {
+        if (t <= 0f) return stops.first()
+        if (t >= 1f) return stops.last()
+        val segments = stops.size - 1
+        val scaled = t * segments
+        val idx = scaled.toInt().coerceIn(0, segments - 1)
+        val local = scaled - idx
+        return ColorScheme.interpolate(stops[idx], stops[idx + 1], local)
+    }
+}
+
+class PastelColorScheme : MultiGradientColorScheme(
+    displayName = "Pastel",
+    stops = listOf(
+        Color(0xFF2B1E34),  // muted dark plum
+        Color(0xFFB39DDB),  // soft lavender
+        Color(0xFF80CBC4),  // pastel mint
+        Color(0xFFF8BBD0),  // pastel pink
+        Color(0xFFFFF9C4),  // pastel cream
+    )
+)
+
+class BobRossColorScheme : MultiGradientColorScheme(
+    displayName = "Bob Ross",
+    stops = listOf(
+        Color(0xFF1B120A),  // Van Dyke brown (dark)
+        Color(0xFF0C3B6A),  // Phthalo blue
+        Color(0xFF2E7D32),  // Sap green
+        Color(0xFFE6A817),  // Cadmium yellow
+        Color(0xFFF5F5F0),  // Titanium white
+    )
+)
+
+class NeonColorScheme : MultiGradientColorScheme(
+    displayName = "Neon",
+    stops = listOf(
+        Color(0xFF05050A),  // near-black void
+        Color(0xFFFF00FF),  // hot magenta
+        Color(0xFF00E5FF),  // electric cyan
+        Color(0xFF39FF14),  // neon green
+        Color(0xFFFFFF00),  // laser yellow
+    )
+)
+
+class CyberpunkColorScheme : MultiGradientColorScheme(
+    displayName = "Cyberpunk",
+    stops = listOf(
+        Color(0xFF0A0618),  // deep void purple
+        Color(0xFF0D47A1),  // dark neon blue
+        Color(0xFF00E5FF),  // electric cyan
+        Color(0xFFFF4081),  // hot pink
+        Color(0xFFFFEA00),  // warning yellow
+    )
+)
+
+class SupercarColorScheme : MultiGradientColorScheme(
+    displayName = "Supercar",
+    stops = listOf(
+        Color(0xFF0E0E0E),  // carbon fiber black
+        Color(0xFFCC0000),  // rosso corsa (Ferrari red)
+        Color(0xFFFF8C00),  // McLaren papaya orange
+        Color(0xFFE5CC00),  // Lamborghini giallo
+        Color(0xFF66FF00),  // Lamborghini verde mantis
+    )
+)
+
 /** All built-in color schemes. */
 val ALL_COLOR_SCHEMES: List<ColorScheme> by lazy {
     listOf(
@@ -213,6 +306,11 @@ val ALL_COLOR_SCHEMES: List<ColorScheme> by lazy {
         BlackAndWhiteColorScheme(),
         WhiteAndBlackColorScheme(),
         ChocolateColorScheme(),
+        PastelColorScheme(),
+        BobRossColorScheme(),
+        NeonColorScheme(),
+        CyberpunkColorScheme(),
+        SupercarColorScheme(),
         RandomColorScheme(),
     )
 }
