@@ -48,8 +48,12 @@ actual class GifRecorder {
             val imgWidth = gridWidth * scaleFactor
             val imgHeight = gridHeight * scaleFactor
 
+            // Build a global palette from all frames for consistent colors
+            val globalPalette = buildGlobalPalette(frames, gridWidth, gridHeight, scaleFactor)
+
             FileOutputStream(file).use { fos ->
                 val encoder = SimpleGifEncoder(fos, imgWidth, imgHeight, delayMs / 10)
+                encoder.setGlobalPalette(globalPalette)
                 for (frame in frames) {
                     val pixels = scaleUp(frame, gridWidth, gridHeight, scaleFactor)
                     encoder.addFrame(pixels, imgWidth, imgHeight)
@@ -82,6 +86,95 @@ actual class GifRecorder {
         }
         return out
     }
+
+    /**
+     * Build a 256-color palette sampled across all frames using median-cut
+     * in RGB space. This ensures the palette represents the full animation,
+     * not just the first frame.
+     */
+    private fun buildGlobalPalette(
+        frames: List<IntArray>, w: Int, h: Int, scale: Int
+    ): IntArray {
+        // Collect unique colors across frames (sample to keep it fast)
+        val colorSet = LinkedHashSet<Int>(1024)
+        val sampleInterval = maxOf(1, frames.size / 10) // sample ~10 frames
+        for ((idx, frame) in frames.withIndex()) {
+            if (idx % sampleInterval != 0 && idx != frames.lastIndex) continue
+            for (px in frame) {
+                colorSet.add(px and 0x00FFFFFF)
+                if (colorSet.size >= 50000) break
+            }
+        }
+
+        if (colorSet.size <= 256) {
+            val palette = IntArray(256)
+            var i = 0
+            for (c in colorSet) { palette[i++] = c; if (i >= 256) break }
+            return palette
+        }
+
+        // Median-cut quantization to 256 colors
+        return medianCut(colorSet.toIntArray(), 256)
+    }
+
+    /**
+     * Simple median-cut color quantization. Splits the color space into
+     * buckets by the channel with the widest range, then averages each bucket.
+     */
+    private fun medianCut(colors: IntArray, targetCount: Int): IntArray {
+        data class Bucket(val colors: IntArray) {
+            fun rangeOf(channel: Int): Int {
+                var min = 255; var max = 0
+                for (c in colors) {
+                    val v = (c shr channel) and 0xFF
+                    if (v < min) min = v
+                    if (v > max) max = v
+                }
+                return max - min
+            }
+            fun widestChannel(): Int {
+                val rRange = rangeOf(16)
+                val gRange = rangeOf(8)
+                val bRange = rangeOf(0)
+                return when (maxOf(rRange, gRange, bRange)) {
+                    rRange -> 16
+                    gRange -> 8
+                    else -> 0
+                }
+            }
+            fun average(): Int {
+                var rSum = 0L; var gSum = 0L; var bSum = 0L
+                for (c in colors) {
+                    rSum += (c shr 16) and 0xFF
+                    gSum += (c shr 8) and 0xFF
+                    bSum += c and 0xFF
+                }
+                val n = colors.size.toLong()
+                return ((rSum / n).toInt() shl 16) or ((gSum / n).toInt() shl 8) or (bSum / n).toInt()
+            }
+        }
+
+        val buckets = mutableListOf(Bucket(colors))
+        while (buckets.size < targetCount) {
+            // Find bucket with widest range
+            val toSplit = buckets.maxByOrNull {
+                if (it.colors.size < 2) -1 else maxOf(it.rangeOf(16), it.rangeOf(8), it.rangeOf(0))
+            } ?: break
+            if (toSplit.colors.size < 2) break
+            buckets.remove(toSplit)
+            val ch = toSplit.widestChannel()
+            val sorted = toSplit.colors.sortedBy { (it shr ch) and 0xFF }.toIntArray()
+            val mid = sorted.size / 2
+            buckets.add(Bucket(sorted.copyOfRange(0, mid)))
+            buckets.add(Bucket(sorted.copyOfRange(mid, sorted.size)))
+        }
+
+        val palette = IntArray(256)
+        for (i in buckets.indices.take(256)) {
+            palette[i] = buckets[i].average()
+        }
+        return palette
+    }
 }
 
 /**
@@ -97,17 +190,21 @@ internal class SimpleGifEncoder(
     private var globalPalette: IntArray? = null
     private var firstFrame = true
 
+    fun setGlobalPalette(palette: IntArray) {
+        globalPalette = palette
+    }
+
     fun addFrame(pixels: IntArray, imgWidth: Int, imgHeight: Int) {
-        val palette = buildPalette(pixels)
-        val indexed = quantize(pixels, palette)
+        val palette = globalPalette ?: buildPalette(pixels)
 
         if (firstFrame) {
-            globalPalette = palette
+            if (globalPalette == null) globalPalette = palette
             writeHeader(palette)
             writeNetscapeExtension()
             firstFrame = false
         }
 
+        val indexed = quantize(pixels, palette)
         writeGraphicControlExtension(delayCentiseconds)
         writeImageDescriptor(imgWidth, imgHeight)
         writeLzwCompressed(indexed, 8)
@@ -135,9 +232,15 @@ internal class SimpleGifEncoder(
     }
 
     private fun quantize(pixels: IntArray, palette: IntArray): ByteArray {
-        val paletteSize = palette.count { it != 0 || palette[0] == 0 }.coerceAtMost(256)
+        // Find the actual palette size (entries that were set)
+        var paletteSize = 256
+        for (i in palette.indices.reversed()) {
+            if (palette[i] != 0 || i == 0) { paletteSize = i + 1; break }
+        }
+        paletteSize = paletteSize.coerceIn(1, 256)
+
         val lookup = HashMap<Int, Byte>(paletteSize * 2)
-        for (i in 0 until paletteSize.coerceAtMost(256)) {
+        for (i in 0 until paletteSize) {
             lookup[palette[i]] = i.toByte()
         }
 
