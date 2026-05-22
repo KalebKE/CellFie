@@ -160,6 +160,20 @@ fun MainScreen(
     var gifRecording by remember { mutableStateOf(false) }
     var gifFrameCount by remember { mutableStateOf(0) }
     val maxGifFrames = 500
+    var gifSaving by remember { mutableStateOf(false) }
+    var gifSaveProgress by remember { mutableStateOf(0f) }
+
+    // Poll GIF save progress from the recorder's background thread
+    LaunchedEffect(gifSaving) {
+        if (!gifSaving) return@LaunchedEffect
+        while (gifRecorder.isSaving) {
+            gifSaveProgress = gifRecorder.saveProgress
+            kotlinx.coroutines.delay(50)
+        }
+        gifSaveProgress = 1f
+        kotlinx.coroutines.delay(300) // brief flash of 100%
+        gifSaving = false
+    }
 
     // Dialog states
     var showAbout by remember { mutableStateOf(false) }
@@ -222,6 +236,7 @@ fun MainScreen(
             if (gifRecorder.frameCount >= maxGifFrames) {
                 gifRecording = false
                 gifRecorder.stopAndSave()
+                gifSaving = true
                 gifFrameCount = 0
             }
         }
@@ -413,6 +428,7 @@ fun MainScreen(
         if (externalStopGif > 0 && gifRecording) {
             gifRecording = false
             gifRecorder.stopAndSave()
+            gifSaving = true
             gifFrameCount = 0
         }
     }
@@ -694,6 +710,7 @@ fun MainScreen(
                             if (gifRecording) {
                                 gifRecording = false
                                 gifRecorder.stopAndSave()
+                                gifSaving = true
                                 gifFrameCount = 0
                             } else {
                                 gifRecorder.startRecording(gridWidth, gridHeight)
@@ -987,6 +1004,31 @@ fun MainScreen(
             // User Guide help dialog
             if (showHelp) {
                 HelpDialog(onDismiss = { showHelp = false })
+            }
+
+            // GIF save progress dialog
+            if (gifSaving) {
+                AlertDialog(
+                    onDismissRequest = {},
+                    confirmButton = {},
+                    title = { Text("Saving GIF…") },
+                    text = {
+                        Column(
+                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            LinearProgressIndicator(
+                                progress = { gifSaveProgress },
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            Text(
+                                "${(gifSaveProgress * 100).toInt()}%",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                )
             }
         }
     }

@@ -9,6 +9,10 @@ actual class GifRecorder {
         private set
     actual var frameCount: Int = 0
         private set
+    actual var saveProgress: Float = 0f
+        private set
+    actual var isSaving: Boolean = false
+        private set
 
     private var frames = mutableListOf<IntArray>()
     private var gridWidth = 0
@@ -47,21 +51,36 @@ actual class GifRecorder {
 
             val imgWidth = gridWidth * scaleFactor
             val imgHeight = gridHeight * scaleFactor
+            val totalFrames = frames.size
+            val capturedFrames = ArrayList(frames)
 
-            // Build a global palette from all frames for consistent colors
-            val globalPalette = buildGlobalPalette(frames, gridWidth, gridHeight, scaleFactor)
+            isSaving = true
+            saveProgress = 0f
 
-            FileOutputStream(file).use { fos ->
-                val encoder = SimpleGifEncoder(fos, imgWidth, imgHeight, delayMs / 10)
-                encoder.setGlobalPalette(globalPalette)
-                for (frame in frames) {
-                    val pixels = scaleUp(frame, gridWidth, gridHeight, scaleFactor)
-                    encoder.addFrame(pixels, imgWidth, imgHeight)
+            // Encode on a background thread so UI stays responsive
+            Thread {
+                try {
+                    val globalPalette = buildGlobalPalette(capturedFrames, gridWidth, gridHeight, scaleFactor)
+                    saveProgress = 0.05f // palette built
+
+                    FileOutputStream(file).use { fos ->
+                        val encoder = SimpleGifEncoder(fos, imgWidth, imgHeight, delayMs / 10)
+                        encoder.setGlobalPalette(globalPalette)
+                        for ((idx, frame) in capturedFrames.withIndex()) {
+                            val pixels = scaleUp(frame, gridWidth, gridHeight, scaleFactor)
+                            encoder.addFrame(pixels, imgWidth, imgHeight)
+                            saveProgress = 0.05f + 0.95f * (idx + 1).toFloat() / totalFrames
+                        }
+                        encoder.finish()
+                    }
+                } finally {
+                    saveProgress = 1f
+                    isSaving = false
                 }
-                encoder.finish()
-            }
+            }.start()
+        } else {
+            frames.clear()
         }
-        frames.clear()
     }
 
     actual fun cancel() {
