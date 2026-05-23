@@ -62,7 +62,7 @@ actual class GifRecorder {
             Thread {
                 try {
                     val globalPalette = buildGlobalPalette(capturedFrames, gridWidth, gridHeight, scaleFactor)
-                    saveProgress = 0.05f // palette built
+                    saveProgress = 0.05f
 
                     FileOutputStream(file).use { fos ->
                         val encoder = SimpleGifEncoder(fos, imgWidth, imgHeight, delayMs / 10)
@@ -137,55 +137,58 @@ actual class GifRecorder {
         }
 
         // Median-cut quantization to 256 colors
-        return medianCut(colorSet.toIntArray(), 256)
+        return GifRecorder.medianCut(colorSet.toIntArray(), 256)
     }
 
     /**
      * Simple median-cut color quantization. Splits the color space into
      * buckets by the channel with the widest range, then averages each bucket.
      */
-    private fun medianCut(colors: IntArray, targetCount: Int): IntArray {
-        data class Bucket(val colors: IntArray) {
-            fun rangeOf(channel: Int): Int {
-                var min = 255; var max = 0
-                for (c in colors) {
-                    val v = (c shr channel) and 0xFF
-                    if (v < min) min = v
-                    if (v > max) max = v
-                }
-                return max - min
+    internal companion object {
+        fun medianCut(colors: IntArray, targetCount: Int): IntArray {
+        data class Bucket(val colors: IntArray)
+
+        fun rangeOf(bucket: Bucket, channel: Int): Int {
+            var min = 255; var max = 0
+            for (c in bucket.colors) {
+                val v = (c shr channel) and 0xFF
+                if (v < min) min = v
+                if (v > max) max = v
             }
-            fun widestChannel(): Int {
-                val rRange = rangeOf(16)
-                val gRange = rangeOf(8)
-                val bRange = rangeOf(0)
-                return when (maxOf(rRange, gRange, bRange)) {
-                    rRange -> 16
-                    gRange -> 8
-                    else -> 0
-                }
+            return max - min
+        }
+
+        fun widestChannel(bucket: Bucket): Int {
+            val rRange = rangeOf(bucket, 16)
+            val gRange = rangeOf(bucket, 8)
+            val bRange = rangeOf(bucket, 0)
+            return when (maxOf(rRange, gRange, bRange)) {
+                rRange -> 16
+                gRange -> 8
+                else -> 0
             }
-            fun average(): Int {
-                var rSum = 0L; var gSum = 0L; var bSum = 0L
-                for (c in colors) {
-                    rSum += (c shr 16) and 0xFF
-                    gSum += (c shr 8) and 0xFF
-                    bSum += c and 0xFF
-                }
-                val n = colors.size.toLong()
-                return ((rSum / n).toInt() shl 16) or ((gSum / n).toInt() shl 8) or (bSum / n).toInt()
+        }
+
+        fun bucketAverage(bucket: Bucket): Int {
+            var rSum = 0L; var gSum = 0L; var bSum = 0L
+            for (c in bucket.colors) {
+                rSum += (c shr 16) and 0xFF
+                gSum += (c shr 8) and 0xFF
+                bSum += c and 0xFF
             }
+            val n = bucket.colors.size.toLong()
+            return ((rSum / n).toInt() shl 16) or ((gSum / n).toInt() shl 8) or (bSum / n).toInt()
         }
 
         val buckets = mutableListOf(Bucket(colors))
         while (buckets.size < targetCount) {
-            // Find bucket with widest range
             val toSplit = buckets.maxByOrNull {
-                if (it.colors.size < 2) -1 else maxOf(it.rangeOf(16), it.rangeOf(8), it.rangeOf(0))
+                if (it.colors.size < 2) -1 else maxOf(rangeOf(it, 16), rangeOf(it, 8), rangeOf(it, 0))
             } ?: break
             if (toSplit.colors.size < 2) break
-            buckets.remove(toSplit)
-            val ch = toSplit.widestChannel()
+            val removed = buckets.remove(toSplit)
+            if (!removed) break
+            val ch = widestChannel(toSplit)
             val sorted = toSplit.colors.sortedBy { (it shr ch) and 0xFF }.toIntArray()
             val mid = sorted.size / 2
             buckets.add(Bucket(sorted.copyOfRange(0, mid)))
@@ -194,9 +197,10 @@ actual class GifRecorder {
 
         val palette = IntArray(256)
         for (i in buckets.indices.take(256)) {
-            palette[i] = buckets[i].average()
+            palette[i] = bucketAverage(buckets[i])
         }
         return palette
+        }
     }
 }
 
