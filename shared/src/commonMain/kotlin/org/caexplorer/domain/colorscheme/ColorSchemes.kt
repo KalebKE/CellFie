@@ -213,6 +213,10 @@ open class MultiGradientColorScheme(
     private var cachedColors: Array<Color>? = null
     private var cachedNumStates = -1
 
+    override fun getColor(percent: Double): Color {
+        return sampleGradient(percent.toFloat())
+    }
+
     @Synchronized
     override fun getColor(state: Int, numStates: Int): Color {
         if (numStates <= 1) return emptyColor
