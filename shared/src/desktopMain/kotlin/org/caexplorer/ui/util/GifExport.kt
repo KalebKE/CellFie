@@ -53,6 +53,7 @@ actual class GifRecorder {
             val imgHeight = gridHeight * scaleFactor
             val totalFrames = frames.size
             val capturedFrames = ArrayList(frames)
+            frames.clear() // free memory
 
             isSaving = true
             saveProgress = 0f
@@ -73,6 +74,9 @@ actual class GifRecorder {
                         }
                         encoder.finish()
                     }
+                } catch (e: Exception) {
+                    System.err.println("GIF encoding error: ${e.message}")
+                    e.printStackTrace()
                 } finally {
                     saveProgress = 1f
                     isSaving = false
@@ -251,12 +255,8 @@ internal class SimpleGifEncoder(
     }
 
     private fun quantize(pixels: IntArray, palette: IntArray): ByteArray {
-        // Find the actual palette size (entries that were set)
-        var paletteSize = 256
-        for (i in palette.indices.reversed()) {
-            if (palette[i] != 0 || i == 0) { paletteSize = i + 1; break }
-        }
-        paletteSize = paletteSize.coerceIn(1, 256)
+        // Always use full 256-entry palette (GCT is always 256 entries)
+        val paletteSize = 256
 
         val lookup = HashMap<Int, Byte>(paletteSize * 2)
         for (i in 0 until paletteSize) {
@@ -363,9 +363,10 @@ internal class SimpleGifEncoder(
 
         fun resetTable() {
             table.clear()
-            for (i in 0 until clearCode) {
-                table[i.toLong()] = i
-            }
+            // Don't add single-character codes to the table.
+            // Keys are (prefix << 12) | suffix — single chars are implicit
+            // (codes 0..255 represent single chars by definition in LZW).
+            // Adding them would collide with prefix=0 lookups.
             codeSize = minCodeSize + 1
             nextCode = eoiCode + 1
         }
