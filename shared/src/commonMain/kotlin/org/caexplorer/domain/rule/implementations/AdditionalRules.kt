@@ -351,64 +351,73 @@ class MajorityVote(
 // =============================================================================
 
 /**
- * Neural Net: Each cell is a neuron. The neighbors serve as inputs with
- * uniform weights. A sigmoid transfer function produces the output, which
- * is scaled and rounded to the nearest integer state.
+ * Neural Net CA using a Lenia-inspired growth function.
  *
- * Produces domain-like patterns that self-organize.
+ * Instead of a simple sigmoid, uses a bell-curve growth function centered
+ * at a target neighborhood activation level. The state is updated additively
+ * (state += dt * growth), producing flowing, organic patterns that
+ * self-organize rather than converging to a fixed point.
  *
- * Port of Java NeuralNet.
+ * The growth function returns +1 when neighborhood density matches the
+ * target (mu), causing cells to grow, and -1 when density is far from
+ * the target, causing cells to decay. This creates structures that
+ * maintain the right local density — similar to living organisms.
  */
 class NeuralNetCA(
-    override val numStates: Int = 10,
-    val slope: Float = 2.0f,
-    val selfWeight: Float = -0.5f,
-    val noise: Float = 0.05f
+    override val numStates: Int = 24,
+    val mu: Float = 0.22f,
+    val sigma: Float = 0.06f,
+    val dt: Float = 0.12f,
+    val noise: Float = 0.01f
 ) : IntegerRule() {
     override val displayName = "Neural Net"
-    override val description = "Neurons with sigmoid activation, self-inhibition, and noise"
+    override val description = "Lenia-inspired growth: flowing organic patterns that self-organize"
     override val category = RuleCategory.NEURAL
     override val compatibleLatticeNames = listOf("Square (Moore)")
 
     override fun nextState(cell: Cell, neighbors: Array<Cell>): CellState {
-        val halfRange = (numStates - 1.0) / 2.0
-        val k = slope.toDouble() / neighbors.size
+        val maxState = numStates - 1
+        if (maxState <= 0) return cell.currentState
 
-        // Self-connection: negative = inhibitory (creates oscillation)
-        var weightedSum = (cell.currentState.toInt().toDouble() - halfRange) * selfWeight
-
-        // Neighbor inputs
+        // Normalize neighbor states to [0, 1] weighted average
+        var sum = 0.0
         for (n in neighbors) {
-            weightedSum += (n.currentState.toInt().toDouble() - halfRange)
+            sum += n.currentState.toInt().toDouble()
         }
+        val neighborActivation = sum / (neighbors.size * maxState)
 
-        // Stochastic perturbation prevents fixed-point convergence
+        // Bell-curve growth function: peaks at mu, decays with sigma
+        val diff = neighborActivation - mu
+        val growth = 2.0 * exp(-(diff * diff) / (2.0 * sigma * sigma)) - 1.0
+
+        // Additive update: current state shifts by dt * growth
+        val currentNorm = cell.currentState.toInt().toDouble() / maxState
+        var newNorm = currentNorm + dt * growth
+
+        // Optional noise to prevent getting stuck
         if (noise > 0f) {
-            weightedSum += (Random.nextDouble() - 0.5) * noise * numStates
+            newNorm += (Random.nextDouble() - 0.5) * noise * 2.0
         }
 
-        // Sigmoid transfer function
-        val sigmoidOutput = 1.0 / (1.0 + exp(-k * weightedSum))
-
-        val scaled = sigmoidOutput * (numStates - 1)
-        val cellValue = round(scaled).toInt().coerceIn(0, numStates - 1)
-
-        return IntegerCellState(cellValue)
+        val newState = round(newNorm.coerceIn(0.0, 1.0) * maxState).toInt()
+        return IntegerCellState(newState)
     }
 
     override fun createInitialState(): CellState = IntegerCellState(0)
 
     override val properties get() = listOf(
-        RuleProperty.IntProperty("numStates", "States", numStates, 2, 256, "Number of cell states"),
-        RuleProperty.FloatProperty("slope", "Slope", slope, 0.5f, 8.0f, "Activation steepness"),
-        RuleProperty.FloatProperty("selfWeight", "Self Weight", selfWeight, -2.0f, 2.0f, "Self-connection (-=inhibit, +=excite)"),
-        RuleProperty.FloatProperty("noise", "Noise", noise, 0.0f, 0.5f, "Random perturbation")
+        RuleProperty.IntProperty("numStates", "States", numStates, 4, 256, "Number of cell states (more = smoother)"),
+        RuleProperty.FloatProperty("mu", "Target μ", mu, 0.05f, 0.60f, "Neighborhood density for growth"),
+        RuleProperty.FloatProperty("sigma", "Width σ", sigma, 0.01f, 0.20f, "Growth function width (narrow = sharper)"),
+        RuleProperty.FloatProperty("dt", "Speed dt", dt, 0.01f, 0.30f, "Update step size"),
+        RuleProperty.FloatProperty("noise", "Noise", noise, 0.0f, 0.10f, "Random perturbation")
     )
     override fun withProperty(key: String, value: Any): Rule = when (key) {
-        "numStates" -> NeuralNetCA((value as Number).toInt().coerceIn(2, 256), slope, selfWeight, noise)
-        "slope" -> NeuralNetCA(numStates, (value as Number).toFloat().coerceIn(0.5f, 8.0f), selfWeight, noise)
-        "selfWeight" -> NeuralNetCA(numStates, slope, (value as Number).toFloat().coerceIn(-2.0f, 2.0f), noise)
-        "noise" -> NeuralNetCA(numStates, slope, selfWeight, (value as Number).toFloat().coerceIn(0.0f, 0.5f))
+        "numStates" -> NeuralNetCA((value as Number).toInt().coerceIn(4, 256), mu, sigma, dt, noise)
+        "mu" -> NeuralNetCA(numStates, (value as Number).toFloat().coerceIn(0.05f, 0.60f), sigma, dt, noise)
+        "sigma" -> NeuralNetCA(numStates, mu, (value as Number).toFloat().coerceIn(0.01f, 0.20f), dt, noise)
+        "dt" -> NeuralNetCA(numStates, mu, sigma, (value as Number).toFloat().coerceIn(0.01f, 0.30f), noise)
+        "noise" -> NeuralNetCA(numStates, mu, sigma, dt, (value as Number).toFloat().coerceIn(0.0f, 0.10f))
         else -> this
     }
 }
