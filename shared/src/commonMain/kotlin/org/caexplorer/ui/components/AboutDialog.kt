@@ -50,7 +50,7 @@ fun AboutDialog(onDismiss: () -> Unit) {
                 }
                 Spacer(Modifier.height(12.dp))
                 Text(
-                    "CA Explorer",
+                    "CellFie",
                     style = MaterialTheme.typography.headlineMedium
                 )
             }

@@ -621,7 +621,7 @@ fun MainScreen(
             topBar = {
                 TopAppBar(
                     title = {
-                        Text("CA Explorer")
+                        Text("CellFie")
                     },
                     actions = {
                         // Status badge with animated color and proper icons

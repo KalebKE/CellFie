@@ -26,7 +26,7 @@ compose.desktop {
 
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
-            packageName = "CA Explorer"
+            packageName = "CellFie"
             packageVersion = "1.0.0"
             description = "Cellular Automaton Explorer"
 
@@ -37,7 +37,7 @@ compose.desktop {
 
             windows {
                 iconFile.set(project.file("icons/icon.ico"))
-                menuGroup = "CA Explorer"
+                menuGroup = "CellFie"
             }
 
             linux {

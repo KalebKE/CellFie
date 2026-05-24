@@ -11,7 +11,7 @@ import org.caexplorer.ui.AppActions
 fun main() = application {
     Window(
         onCloseRequest = ::exitApplication,
-        title = "CA Explorer",
+        title = "CellFie",
         state = rememberWindowState(width = 1280.dp, height = 900.dp)
     ) {
         MenuBar {
@@ -46,7 +46,7 @@ fun main() = application {
                 Item("User Guide", onClick = { AppActions.requestHelp() })
                 Item("Keyboard Shortcuts", onClick = { AppActions.requestKeyboardHelp() })
                 Separator()
-                Item("About CA Explorer", onClick = { AppActions.requestAbout() })
+                Item("About CellFie", onClick = { AppActions.requestAbout() })
             }
         }
         App()

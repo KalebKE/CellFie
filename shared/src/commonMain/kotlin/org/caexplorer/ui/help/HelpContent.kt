@@ -11,9 +11,9 @@ object HelpContent {
             icon = "🚀",
             sections = listOf(
                 HelpSection(
-                    title = "What Is CA Explorer?",
+                    title = "What Is CellFie?",
                     content = """
-CA Explorer is a cellular automaton simulator built with Kotlin and Compose Multiplatform. It lets you explore a wide variety of cellular automaton rules on different grid topologies, visualize their evolution in real time, and analyze emergent behavior with built-in analysis tools.
+CellFie is a cellular automaton simulator built with Kotlin and Compose Multiplatform. It lets you explore a wide variety of cellular automaton rules on different grid topologies, visualize their evolution in real time, and analyze emergent behavior with built-in analysis tools.
                     """.trimIndent()
                 ),
                 HelpSection(
@@ -90,7 +90,7 @@ Press **D** to enter draw mode. The simulation auto-pauses while drawing. Click 
                 HelpSection(
                     title = "Overview",
                     content = """
-CA Explorer includes a curated library of cellular automaton rules spanning many categories. Open the rule picker to browse, search, and select rules. Each rule card shows the rule's name, category, and a brief description.
+CellFie includes a curated library of cellular automaton rules spanning many categories. Open the rule picker to browse, search, and select rules. Each rule card shows the rule's name, category, and a brief description.
                     """.trimIndent()
                 ),
                 HelpSection(
@@ -331,7 +331,7 @@ Use the record button (⏺) in the toolbar to start recording an animated GIF. T
                 HelpSection(
                     title = "Color Schemes",
                     content = """
-CA Explorer includes 12 color schemes: Rainbow, Kind of Blues, Fire, Green Ocean, Blue Diamond, Purple Haze, Water Lilies, Yellow Jacket, Black and White, White and Black, Chocolate, and Random. Change the color scheme in the settings panel to better visualize patterns — gradient schemes work well for multi-state rules, while binary schemes suit two-state rules.
+CellFie includes 12 color schemes: Rainbow, Kind of Blues, Fire, Green Ocean, Blue Diamond, Purple Haze, Water Lilies, Yellow Jacket, Black and White, White and Black, Chocolate, and Random. Change the color scheme in the settings panel to better visualize patterns — gradient schemes work well for multi-state rules, while binary schemes suit two-state rules.
                     """.trimIndent()
                 )
             )
