@@ -26,8 +26,8 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.unit.dp
-import caexplorermp.shared.generated.resources.Res
-import caexplorermp.shared.generated.resources.app_icon
+import cellfie.shared.generated.resources.Res
+import cellfie.shared.generated.resources.app_icon
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.caexplorer.analysis.AnalysisRegistry

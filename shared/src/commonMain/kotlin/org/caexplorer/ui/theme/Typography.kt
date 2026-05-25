@@ -4,9 +4,9 @@ import androidx.compose.material3.Typography
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import caexplorermp.shared.generated.resources.Res
-import caexplorermp.shared.generated.resources.oxanium_variable
-import caexplorermp.shared.generated.resources.vt323_regular
+import cellfie.shared.generated.resources.Res
+import cellfie.shared.generated.resources.oxanium_variable
+import cellfie.shared.generated.resources.vt323_regular
 import org.jetbrains.compose.resources.Font
 
 /** Oxanium — sci-fi display font for headings and titles. */
