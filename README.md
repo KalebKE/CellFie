@@ -86,8 +86,6 @@ Wolfram classified all 256 rules into four behavioral classes:
 
 Class IV sits at the "edge of chaos" between order and randomness — exactly where computation can happen.
 
-> 💡 **Try it:** Select the **Elementary (1D)** category in CellFie, pick any rule number, and watch. Rule 30 and Rule 110 are essential starting points.
-
 ---
 
 ## Conway's Game of Life and Life-like Rules
@@ -140,13 +138,11 @@ CellFie also includes variants of Life on non-square grids:
 - **HexLife** — Game of Life on a hexagonal lattice (6 neighbors)
 - **TriLife** — Game of Life on a triangular lattice (3 or 12 neighbors)
 
-> 💡 **Try it:** Start with Life (B3/S23) on a random initial state. Then switch to HighLife and watch for replicators, or try Seeds for explosive growth.
-
 ---
 
 ## Rule Categories
 
-### 🔬 Totalistic Rules
+### Totalistic Rules
 
 **Totalistic rules** depend only on the *sum* of cell values in the neighborhood, not on their individual positions. This makes them rotationally symmetric.
 
@@ -160,7 +156,7 @@ CellFie also includes variants of Life on non-square grids:
 | Rule 301 | **Electric Loops** | Pulsing closed-loop circuits |
 | Rule 429 | **Super Loops** | Persistent self-sustaining loops |
 
-### 📊 Continuous Rules
+### Continuous Rules
 
 Instead of discrete 0/1 states, cells hold **real numbers** (floating-point values). Rules typically average neighbors and apply a function:
 
@@ -178,7 +174,7 @@ next = f(average_of_neighbors)
 | **Water Skimmers** | Averaging with random perturbation — water-surface ripples |
 | **Thunderstorm** | Averaging with sinusoidal time-varying disturbance |
 
-### 🧠 Neural
+### Neural
 
 Neural-network-inspired cellular automata, where cells behave like artificial neurons:
 
@@ -186,7 +182,7 @@ Neural-network-inspired cellular automata, where cells behave like artificial ne
 
 - **NeuralNet CA (Lenia)** — Inspired by Bert Chan's [Lenia](https://arxiv.org/abs/1812.05433), this uses a continuous growth function with a bell curve kernel. Produces remarkably organic, self-organizing lifeforms — blobs that move, pulsate, and interact like actual organisms.
 
-### 🗳️ Social
+### Social
 
 Models of collective behavior, opinion dynamics, and social influence:
 
@@ -199,7 +195,7 @@ Models of collective behavior, opinion dynamics, and social influence:
 | **Obesity Model** | Social influence model with 4 states (underweight → normal → overweight → obese). Uses Boltzmann-weighted transitions based on neighborhood composition. |
 | **Cellular Market Model** | Commodity trader herding model with temperature and noise parameters — models financial market bubbles and crashes |
 
-### ⚡ Physics
+### Physics
 
 Simulations inspired by physical systems:
 
@@ -211,7 +207,7 @@ Simulations inspired by physical systems:
 | **Diffusion-Limited Aggregation** | Random walkers stick to a growing cluster, producing beautiful fractal dendrites — like frost forming on a window. |
 | **Forest Fire** | 8-state ecological model: bare ground → seedling → sapling → tree → burning → smoldering → ashes → bare ground. Trees grow probabilistically; lightning strikes rarely; fire spreads to neighbors. |
 
-### 🎲 Probabilistic
+### Probabilistic
 
 Rules that incorporate randomness:
 
@@ -222,7 +218,7 @@ Rules that incorporate randomness:
 | **Forest Fire** | Growth and lightning are probabilistic events |
 | **Ising Model** | Metropolis algorithm — thermal fluctuations drive random spin flips |
 
-### 🌀 Fractal
+### Fractal
 
 Complex-number iterations visualized on the grid:
 
@@ -266,8 +262,6 @@ The [Busy Beaver function](https://en.wikipedia.org/wiki/Busy_beaver) BB(n) asks
 | 5 | 4,098 | 47,176,870 | Marxen & Buntrock — impractical to run to completion in real time |
 
 BB(6) and beyond are unknown and believed to be incomprehensibly large.
-
-> 💡 **Try it:** Select "Turing Machine," pick "Busy Beaver," and try each variant. Watch how the 4-state champion dances across the tape for 107 steps before halting with 13 marks.
 
 ---
 
