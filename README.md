@@ -160,6 +160,12 @@ CellFie also includes variants of Life on non-square grids:
 | Rule 301 | **Electric Loops** | Pulsing closed-loop circuits |
 | Rule 429 | **Super Loops** | Persistent self-sustaining loops |
 
+<p align="center">
+  <img src="screenshots/totalistic_snowflake.png" width="300" alt="Snowflake totalistic rule">&nbsp;&nbsp;
+  <img src="screenshots/totalistic_electric_loops.png" width="300" alt="Electric Loops totalistic rule">
+</p>
+<p align="center"><em>Snowflake and Electric Loops — outer-totalistic rules from seeded and random starts</em></p>
+
 ### Continuous Rules
 
 Instead of discrete 0/1 states, cells hold **real numbers** (floating-point values). Rules typically average neighbors and apply a function:
@@ -178,6 +184,13 @@ next = f(average_of_neighbors)
 | **Water Skimmers** | Averaging with random perturbation — water-surface ripples |
 | **Thunderstorm** | Averaging with sinusoidal time-varying disturbance |
 
+<p align="center">
+  <img src="screenshots/continuous_class_iv.png" width="250" alt="Continuous CA Class IV">&nbsp;&nbsp;
+  <img src="screenshots/real_spirals.png" width="250" alt="Real Spirals">&nbsp;&nbsp;
+  <img src="screenshots/thunderstorm.png" width="250" alt="Thunderstorm">
+</p>
+<p align="center"><em>Continuous Class IV, Real Spirals, and Thunderstorm</em></p>
+
 ### Neural
 
 Neural-network-inspired cellular automata, where cells behave like artificial neurons:
@@ -187,7 +200,7 @@ Neural-network-inspired cellular automata, where cells behave like artificial ne
 - **NeuralNet CA (Lenia)** — Inspired by Bert Chan's [Lenia](https://arxiv.org/abs/1812.05433), this uses a continuous growth function with a bell curve kernel. Produces remarkably organic, self-organizing lifeforms — blobs that move, pulsate, and interact like actual organisms.
 
 <p align="center">
-  <img src="screenshots/screenshot-2026-05-25-11-11-02.png" width="600" alt="Lenia Growth">
+  <img src="screenshots/lenia_growth.png" width="400" alt="Lenia Growth">
 </p>
 <p align="center"><em>Lenia Growth — organic blobs and pulsating lifeforms</em></p>
 
@@ -204,6 +217,12 @@ Models of collective behavior, opinion dynamics, and social influence:
 | **Obesity Model** | Social influence model with 4 states (underweight → normal → overweight → obese). Uses Boltzmann-weighted transitions based on neighborhood composition. |
 | **Cellular Market Model** | Commodity trader herding model with temperature and noise parameters — models financial market bubbles and crashes |
 
+<p align="center">
+  <img src="screenshots/majority_vote.png" width="300" alt="Majority Vote">&nbsp;&nbsp;
+  <img src="screenshots/cellular_market_model.png" width="300" alt="Cellular Market Model">
+</p>
+<p align="center"><em>Majority Vote domains and Cellular Market herding</em></p>
+
 ### Physics
 
 Simulations inspired by physical systems:
@@ -216,6 +235,12 @@ Simulations inspired by physical systems:
 | **Diffusion-Limited Aggregation** | Random walkers stick to a growing cluster, producing beautiful fractal dendrites — like frost forming on a window. |
 | **Forest Fire** | 8-state ecological model: bare ground → seedling → sapling → tree → burning → smoldering → ashes → bare ground. Trees grow probabilistically; lightning strikes rarely; fire spreads to neighbors. |
 
+<p align="center">
+  <img src="screenshots/wireworld.png" width="300" alt="Wireworld">&nbsp;&nbsp;
+  <img src="screenshots/ising_model.png" width="300" alt="Ising Model">
+</p>
+<p align="center"><em>Wireworld signal paths and Ising magnetic domains</em></p>
+
 ### Probabilistic
 
 Rules that incorporate randomness:
@@ -227,6 +252,11 @@ Rules that incorporate randomness:
 | **Forest Fire** | Growth and lightning are probabilistic events |
 | **Ising Model** | Metropolis algorithm — thermal fluctuations drive random spin flips |
 
+<p align="center">
+  <img src="screenshots/forest_fire.png" width="400" alt="Forest Fire">
+</p>
+<p align="center"><em>Forest Fire — probabilistic growth, lightning, and spreading burn fronts</em></p>
+
 ### Fractal
 
 Complex-number iterations visualized on the grid:
@@ -237,6 +267,11 @@ Complex-number iterations visualized on the grid:
 | **Julia (Chinese Dragon)** | Julia set at c = −0.835 − 0.2321i with sinusoidal phase cycling — creates a tornado animation |
 | **Moving Fractal** | Mandelbrot set with a slowly drifting center point |
 | **Fractal Iteration / Threshold** | Iteration-count and escape-threshold visualizations |
+
+<p align="center">
+  <img src="screenshots/fractal_mandelbrot.png" width="520" alt="Mandelbrot fractal">
+</p>
+<p align="center"><em>Mandelbrot escape-time visualization</em></p>
 
 ---
 
@@ -257,6 +292,11 @@ CellFie includes a **Turing machine** simulator that runs on the cellular automa
 | **Expanding Square** | Spirals outward in a growing square |
 | **Zigzag** | Alternates directions in a zigzag trail |
 | **Spiral** | Turns on encountering marks, creating an outward spiral |
+
+<p align="center">
+  <img src="screenshots/turing_machine_expanding_square.png" width="400" alt="Turing Machine expanding square program">
+</p>
+<p align="center"><em>Turing Machine — Expanding Square program leaving a marked tape trail</em></p>
 
 ### Busy Beaver Champions
 
@@ -334,6 +374,11 @@ Random particles wander the grid. When a particle touches the growing crystal cl
 - Frost patterns on glass
 - Lightning bolt branching
 - Mineral dendrites in rock
+
+<p align="center">
+  <img src="screenshots/diffusion_limited_aggregation.png" width="400" alt="Diffusion-Limited Aggregation">
+</p>
+<p align="center"><em>Diffusion-Limited Aggregation — a rough stochastic growth front from a center seed</em></p>
 
 ---
 
