@@ -23,7 +23,7 @@ jobs:
       matrix:
         include:
           - name: Windows MSI
-            os: windows-2025
+            os: windows-2025-vs2026
             gradle-task: :desktopApp:packageMsi
             artifact-name: cellfie-windows-msi
             artifact-path: desktopApp/build/compose/binaries/main/msi/*.msi
