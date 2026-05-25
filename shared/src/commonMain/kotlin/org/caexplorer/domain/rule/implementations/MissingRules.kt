@@ -1504,8 +1504,19 @@ class TuringMachine(
             "Preset Turing machine program"
         ))
         if (programName == "Busy Beaver") {
-            add(RuleProperty.IntProperty("bbStates", "TM States", bbStates, 1, 5,
-                "Number of Turing machine finite-control states (1–5)"))
+            val bbChoices = listOf(
+                "1-state (1 mark, 1 step)",
+                "2-state (4 marks, 6 steps)",
+                "3-state (6 marks, 21 steps)",
+                "4-state (13 marks, 107 steps)",
+                "5-state (4098 marks, ~47M steps)"
+            )
+            val currentLabel = bbChoices.getOrElse(bbStates - 1) { bbChoices[2] }
+            add(RuleProperty.ChoiceProperty(
+                "bbStates", "Busy Beaver Variant", currentLabel,
+                bbChoices,
+                "Classic champion Busy Beaver machines"
+            ))
         } else {
             add(RuleProperty.IntProperty("numStates", "Symbols + 1", numStates, 3, 8,
                 "Number of tape symbols + 1 (head marker)"))
@@ -1522,7 +1533,9 @@ class TuringMachine(
             }
         }
         "bbStates" -> {
-            val n = (value as Number).toInt().coerceIn(1, 5)
+            val label = value as String
+            // Parse the state count from the label prefix "N-state ..."
+            val n = label.substringBefore("-state").trim().toIntOrNull()?.coerceIn(1, 5) ?: 3
             TuringMachine(3, "Busy Beaver", n)
         }
         "numStates" -> TuringMachine((value as Number).toInt().coerceIn(3, 8), programName)
