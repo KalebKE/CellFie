@@ -68,6 +68,13 @@ Starting from a single black cell on a white background, each generation is draw
 | **Rule 110** | Complex, Class IV | Proven **Turing-complete** by Matthew Cook in 2004 — the simplest known universal computer. |
 | **Rule 184** | Particle flow | Models one-lane traffic flow. Particles move right unless blocked. |
 
+<p align="center">
+  <img src="screenshots/rule_30.png" width="280" alt="Rule 30">&nbsp;&nbsp;
+  <img src="screenshots/rule_90.png" width="280" alt="Rule 90">&nbsp;&nbsp;
+  <img src="screenshots/rule_110.png" width="280" alt="Rule 110">
+</p>
+<p align="center"><em>Left to right: Rule 30 (chaotic), Rule 90 (Sierpinski triangle), Rule 110 (Turing-complete)</em></p>
+
 ### Wolfram's Four Classes
 
 Wolfram classified all 256 rules into four behavioral classes:
@@ -101,6 +108,11 @@ These three devastatingly simple rules produce:
 - **Guns** — Patterns that emit spaceships indefinitely (Gosper glider gun)
 
 Life was proven **Turing-complete** — you can build a working computer inside it.
+
+<p align="center">
+  <img src="screenshots/game_of_life.png" width="400" alt="Conway's Game of Life">
+</p>
+<p align="center"><em>Game of Life after 200 generations — still lifes, oscillators, and glider debris</em></p>
 
 ### B/S Notation
 
@@ -272,6 +284,11 @@ For the first ~10,000 steps, the ant creates a chaotic, seemingly random blob. T
 
 Langton's Ant is **Turing-complete**.
 
+<p align="center">
+  <img src="screenshots/langtons_ant.png" width="400" alt="Langton's Ant">
+</p>
+<p align="center"><em>Langton's Ant after 12,000 steps — chaotic blob gives way to the emergent highway</em></p>
+
 ### Brian's Brain
 
 A three-state excitable medium:
@@ -282,9 +299,19 @@ A three-state excitable medium:
 
 This creates self-sustaining waves, filaments, and traveling "sparks" that collide and interact. It models excitable media like heart tissue or neural networks.
 
+<p align="center">
+  <img src="screenshots/brians_brain.png" width="400" alt="Brian's Brain">
+</p>
+<p align="center"><em>Brian's Brain — chaotic sparks and traveling wave fronts</em></p>
+
 ### Cyclic CA
 
 Cells cycle through N states (default 14). A cell advances to the next state only if at least one neighbor is already in that successor state. This creates mesmerizing **spiral waves** that form spontaneously from random initial conditions — resembling chemical reaction-diffusion patterns (like the Belousov–Zhabotinsky reaction).
+
+<p align="center">
+  <img src="screenshots/cyclic_ca.png" width="400" alt="Cyclic CA">
+</p>
+<p align="center"><em>Cyclic CA — spiral wave fronts cascade through 14 states</em></p>
 
 ### Langton's Lambda (λ)
 
