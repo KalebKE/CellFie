@@ -51,6 +51,8 @@ import org.caexplorer.ui.components.AnalysisDashboard
 import org.caexplorer.ui.components.ConfigPanel
 import org.caexplorer.ui.components.HelpDialog
 import org.caexplorer.ui.components.KeyboardShortcutsSheet
+import org.caexplorer.domain.rule.Rule
+import org.caexplorer.domain.rule.RuleProperty
 import org.caexplorer.ui.components.RulePickerSheet
 import org.caexplorer.ui.components.SimulationCanvas
 import org.caexplorer.ui.components.VoxelCanvas
@@ -75,6 +77,55 @@ enum class InitPattern(val displayName: String) {
     RANDOM_SYMMETRIC("Symmetric Random"),
     CROSS("Cross"),
     DIAGONAL("Diagonal Stripes")
+}
+
+/**
+ * Serialize rule properties to a simple key=value string for persistence.
+ */
+private fun saveRuleProperties(rule: Rule) {
+    val props = rule.properties
+    if (props.isEmpty()) {
+        AppSettings.putString(SettingsKeys.LAST_RULE_PROPERTIES, "")
+        return
+    }
+    val serialized = props.joinToString(";") { prop ->
+        val value = when (prop) {
+            is RuleProperty.IntProperty -> prop.value.toString()
+            is RuleProperty.FloatProperty -> prop.value.toString()
+            is RuleProperty.BooleanProperty -> prop.value.toString()
+            is RuleProperty.ChoiceProperty -> prop.value
+        }
+        "${prop.key}=$value"
+    }
+    AppSettings.putString(SettingsKeys.LAST_RULE_PROPERTIES, serialized)
+}
+
+/**
+ * Restore saved properties onto a rule instance.
+ */
+private fun restoreRuleProperties(rule: Rule): Rule {
+    val serialized = AppSettings.getString(SettingsKeys.LAST_RULE_PROPERTIES, "")
+    if (serialized.isEmpty()) return rule
+
+    val savedMap = serialized.split(";").mapNotNull { entry ->
+        val parts = entry.split("=", limit = 2)
+        if (parts.size == 2) parts[0] to parts[1] else null
+    }.toMap()
+
+    var result = rule
+    for (prop in rule.properties) {
+        val savedValue = savedMap[prop.key] ?: continue
+        val typedValue: Any = when (prop) {
+            is RuleProperty.IntProperty -> savedValue.toIntOrNull() ?: continue
+            is RuleProperty.FloatProperty -> savedValue.toFloatOrNull() ?: continue
+            is RuleProperty.BooleanProperty -> savedValue.toBooleanStrictOrNull() ?: continue
+            is RuleProperty.ChoiceProperty -> {
+                if (savedValue in prop.choices) savedValue else continue
+            }
+        }
+        result = result.withProperty(prop.key, typedValue)
+    }
+    return result
 }
 
 /**
@@ -121,10 +172,29 @@ fun MainScreen(
     }
 
     // Current rule instance (may differ from rules[selectedRuleIndex] if properties were changed)
-    var currentRule by remember { mutableStateOf<Rule?>(rules.getOrNull(selectedRuleIndex)) }
+    var currentRule by remember {
+        // Restore rule by name, then apply saved properties
+        val savedName = AppSettings.getString(SettingsKeys.LAST_RULE_NAME, "")
+        val baseRule = if (savedName.isNotEmpty()) {
+            val found = rules.indexOfFirst { it.displayName == savedName }
+            if (found >= 0) {
+                selectedRuleIndex = found
+                rules[found]
+            } else null
+        } else null
 
-    // Init pattern
-    var initPattern by remember { mutableStateOf(InitPattern.AUTO) }
+        val rule = baseRule ?: rules.getOrNull(selectedRuleIndex)
+        val restored = rule?.let { restoreRuleProperties(it) } ?: rule
+        mutableStateOf(restored)
+    }
+
+    // Init pattern — load from settings
+    var initPattern by remember {
+        val saved = AppSettings.getString(SettingsKeys.INIT_PATTERN, InitPattern.AUTO.name)
+        mutableStateOf(
+            try { InitPattern.valueOf(saved) } catch (_: Exception) { InitPattern.AUTO }
+        )
+    }
 
     // Lattice type — load from settings
     var selectedLatticeType by remember {
@@ -136,6 +206,9 @@ fun MainScreen(
 
     // Reset key — incrementing triggers re-initialization
     var resetKey by remember { mutableStateOf(0) }
+
+    // Tracks whether the initial LaunchedEffect(selectedRuleIndex) has fired
+    var ruleIndexInitialized by remember { mutableStateOf(false) }
 
     // Fit-to-window trigger for canvas zoom reset
     var fitToWindowTrigger by remember { mutableStateOf(0) }
@@ -254,9 +327,25 @@ fun MainScreen(
     }
     LaunchedEffect(selectedRuleIndex) {
         AppSettings.putInt(SettingsKeys.LAST_RULE_INDEX, selectedRuleIndex)
-        currentRule = rules.getOrNull(selectedRuleIndex)
+        // On initial composition, currentRule is already set with restored properties.
+        // Only overwrite on subsequent user-driven changes.
+        if (ruleIndexInitialized) {
+            currentRule = rules.getOrNull(selectedRuleIndex)
+            val ruleName = currentRule?.displayName ?: ""
+            AppSettings.putString(SettingsKeys.LAST_RULE_NAME, ruleName)
+            // Clear saved properties when switching rules (will be re-saved by currentRule effect)
+            AppSettings.putString(SettingsKeys.LAST_RULE_PROPERTIES, "")
+        } else {
+            ruleIndexInitialized = true
+        }
         // Trigger canvas fade on rule switch
         canvasFadeTrigger++
+    }
+    LaunchedEffect(currentRule) {
+        currentRule?.let { rule ->
+            AppSettings.putString(SettingsKeys.LAST_RULE_NAME, rule.displayName)
+            saveRuleProperties(rule)
+        }
     }
     LaunchedEffect(canvasFadeTrigger) {
         if (canvasFadeTrigger % 2 != 0) {
@@ -269,6 +358,9 @@ fun MainScreen(
     }
     LaunchedEffect(speedIndex) {
         AppSettings.putInt(SettingsKeys.SPEED_INDEX, speedIndex)
+    }
+    LaunchedEffect(initPattern) {
+        AppSettings.putString(SettingsKeys.INIT_PATTERN, initPattern.name)
     }
     LaunchedEffect(selectedLatticeType) {
         AppSettings.putString(SettingsKeys.LATTICE_TYPE, selectedLatticeType.name)
