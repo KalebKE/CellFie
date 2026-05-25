@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="20 20 60 60">
+  <title>CellFie — Selfie mark</title>
+  <defs>
+    <pattern id="cellfie-grid" x="23.75" y="23.75" width="7.5" height="7.5" patternUnits="userSpaceOnUse">
+      <rect width="6.5" height="6.5" rx="1" fill="#FFFFFF" opacity="0.05"/>
+    </pattern>
+    <filter id="cellfie-glow" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="1.5" result="b"/>
+      <feMerge>
+        <feMergeNode in="b"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  <rect x="23.75" y="23.75" width="52.5" height="52.5" fill="url(#cellfie-grid)"/>
+  <g filter="url(#cellfie-glow)" fill="#39FF7A">
+    <rect x="31.25" y="31.25" width="6.5" height="6.5" rx="1"/>
+    <rect x="61.25" y="31.25" width="6.5" height="6.5" rx="1"/>
+    <rect x="31.25" y="46.25" width="6.5" height="6.5" rx="1"/>
+    <rect x="61.25" y="46.25" width="6.5" height="6.5" rx="1"/>
+    <rect x="38.75" y="53.75" width="6.5" height="6.5" rx="1"/>
+    <rect x="46.25" y="53.75" width="6.5" height="6.5" rx="1"/>
+    <rect x="53.75" y="53.75" width="6.5" height="6.5" rx="1"/>
+  </g>
+</svg>

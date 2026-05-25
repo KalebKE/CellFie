@@ -16,7 +16,7 @@ import kotlin.random.Random
  * Cyclic Cellular Automaton.
  * Each cell advances to the next state if at least one neighbor is in the next state.
  */
-class CyclicCA(override val numStates: Int = 14) : IntegerRule() {
+class CyclicCA(override val numStates: Int = 14, val threshold: Int = 1) : IntegerRule() {
     override val displayName = "Cyclic CA"
     override val description = "Cyclic cellular automaton with $numStates states"
     override val category = RuleCategory.OTHER
@@ -25,50 +25,61 @@ class CyclicCA(override val numStates: Int = 14) : IntegerRule() {
     override fun nextState(cell: Cell, neighbors: Array<Cell>): CellState {
         val state = cell.currentState.toInt()
         val nextState = (state + 1) % numStates
+        var count = 0
         for (n in neighbors) {
-            if (n.currentState.toInt() == nextState) return IntegerCellState(nextState)
+            if (n.currentState.toInt() == nextState) count++
         }
-        return IntegerCellState(state)
+        return if (count >= threshold) IntegerCellState(nextState) else IntegerCellState(state)
     }
 
     override fun createInitialState(): CellState = IntegerCellState(0)
 
     override val properties get() = listOf(
-        RuleProperty.IntProperty("numStates", "States", numStates, 2, 256, "Number of cell states")
+        RuleProperty.IntProperty("numStates", "States", numStates, 2, 256, "Number of cell states"),
+        RuleProperty.IntProperty("threshold", "Threshold", threshold, 1, 8, "Neighbors needed to advance")
     )
     override fun withProperty(key: String, value: Any): Rule = when (key) {
-        "numStates" -> CyclicCA((value as Number).toInt().coerceIn(2, 256))
+        "numStates" -> CyclicCA((value as Number).toInt().coerceIn(2, 256), threshold)
+        "threshold" -> CyclicCA(numStates, (value as Number).toInt().coerceIn(1, 8))
         else -> this
     }
 }
 
 /**
- * Forest Fire simulation.
- * States: 0 = empty, 1 = tree, 2 = burning
+ * Forest Fire simulation with 8 growth stages.
+ * States: 0 = bare ground, 1-4 = growth stages, 5 = burning, 6 = smoldering, 7 = ashes
  */
 class ForestFire(
     val growthProbability: Double = 0.01,
     val lightningProbability: Double = 0.0001
 ) : IntegerRule() {
-    override val numStates = 3
+    override val numStates = 8
     override val displayName = "Forest Fire"
-    override val description = "Forest fire model (p=$growthProbability, f=$lightningProbability)"
+    override val description = "Forest fire model with growth stages"
     override val category = RuleCategory.PROBABILISTIC
     override val compatibleLatticeNames = listOf("Square (Moore)", "Square (Von Neumann)")
 
     override fun nextState(cell: Cell, neighbors: Array<Cell>): CellState {
         val state = cell.currentState.toInt()
         val nextVal = when (state) {
-            BURNING -> EMPTY
-            TREE -> {
-                val hasFireNeighbor = neighbors.any { it.currentState.toInt() == BURNING }
+            BURNING -> SMOLDERING
+            SMOLDERING -> ASHES
+            ASHES -> BARE_GROUND
+            BARE_GROUND -> {
+                if (Random.nextDouble() < growthProbability) SEEDLING else BARE_GROUND
+            }
+            SEEDLING, SAPLING, YOUNG_TREE, MATURE_TREE -> {
+                val hasFireNeighbor = neighbors.any { it.currentState.toInt() == BURNING || it.currentState.toInt() == SMOLDERING }
                 if (hasFireNeighbor) BURNING
-                else if (Random.nextDouble() < lightningProbability) BURNING
-                else TREE
+                else if (state == MATURE_TREE && Random.nextDouble() < lightningProbability) BURNING
+                else when (state) {
+                    SEEDLING -> SAPLING
+                    SAPLING -> YOUNG_TREE
+                    YOUNG_TREE -> MATURE_TREE
+                    else -> MATURE_TREE
+                }
             }
-            else -> {
-                if (Random.nextDouble() < growthProbability) TREE else EMPTY
-            }
+            else -> BARE_GROUND
         }
         return IntegerCellState(nextVal)
     }
@@ -76,9 +87,14 @@ class ForestFire(
     override fun createInitialState(): CellState = IntegerCellState(0)
 
     companion object {
-        const val EMPTY = 0
-        const val TREE = 1
-        const val BURNING = 2
+        const val BARE_GROUND = 0
+        const val SEEDLING = 1
+        const val SAPLING = 2
+        const val YOUNG_TREE = 3
+        const val MATURE_TREE = 4
+        const val BURNING = 5
+        const val SMOLDERING = 6
+        const val ASHES = 7
     }
 }
 
@@ -129,9 +145,13 @@ class DiffusionLimitedAggregation : BinaryRule() {
 /**
  * Ising model from statistical physics.
  */
-class IsingModel(val temperature: Double = 2.27) : BinaryRule() {
+class IsingModel(
+    val temperature: Double = 2.27,
+    val magneticField: Double = 0.0,
+    val exchangeJ: Double = 1.0
+) : BinaryRule() {
     override val displayName = "Ising Model"
-    override val description = "Ising model at T=$temperature"
+    override val description = "Ising model at T=${"%.2f".format(temperature)}"
     override val category = RuleCategory.PHYSICS
     override val compatibleLatticeNames = listOf("Square (Moore)", "Square (Von Neumann)")
 
@@ -141,7 +161,7 @@ class IsingModel(val temperature: Double = 2.27) : BinaryRule() {
         for (n in neighbors) {
             neighborSum += if (n.currentState.toInt() == 1) 1 else -1
         }
-        val deltaE = 2.0 * spin * neighborSum
+        val deltaE = 2.0 * spin * (magneticField + exchangeJ * neighborSum)
         val flip = if (deltaE <= 0) true
         else Random.nextDouble() < kotlin.math.exp(-deltaE / temperature)
         val newSpin = if (flip) -spin else spin
@@ -149,6 +169,18 @@ class IsingModel(val temperature: Double = 2.27) : BinaryRule() {
     }
 
     override fun createInitialState(): CellState = IntegerCellState(0)
+
+    override val properties get() = listOf(
+        RuleProperty.FloatProperty("temperature", "Temperature", temperature.toFloat(), 0.1f, 10.0f, "Thermal energy (Tc ≈ 2.27)"),
+        RuleProperty.FloatProperty("magneticField", "Field H", magneticField.toFloat(), -2.0f, 2.0f, "External magnetic field"),
+        RuleProperty.FloatProperty("exchangeJ", "Exchange J", exchangeJ.toFloat(), -2.0f, 2.0f, "Spin-spin coupling strength")
+    )
+    override fun withProperty(key: String, value: Any): Rule = when (key) {
+        "temperature" -> IsingModel((value as Number).toDouble().coerceIn(0.1, 10.0), magneticField, exchangeJ)
+        "magneticField" -> IsingModel(temperature, (value as Number).toDouble().coerceIn(-2.0, 2.0), exchangeJ)
+        "exchangeJ" -> IsingModel(temperature, magneticField, (value as Number).toDouble().coerceIn(-2.0, 2.0))
+        else -> this
+    }
 }
 
 /**

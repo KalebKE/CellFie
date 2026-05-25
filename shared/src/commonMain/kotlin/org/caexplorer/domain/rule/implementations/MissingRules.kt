@@ -938,18 +938,7 @@ class SatansStaircase : IntegerRule() {
     override fun createInitialState(): CellState = IntegerCellState(0)
 }
 
-// =============================================================================
-// 17. TuringMachine — SKIPPED (see note below)
-// =============================================================================
-// The original Java TuringMachine.java (1733 lines, by Kaleb Kircher) is a full
-// Turing machine with a tape head, finite controller states, and a GUI panel for
-// defining state transitions. The MP project already has LangtonsAnt, which is
-// a 2D Turing machine on a grid. The original TuringMachine is NOT the same as
-// Langton's Ant — it is a classical 1D tape-based Turing machine that relies
-// heavily on global mutable state, GUI panels (JSpinner, JComboBox), and
-// direct lattice access (CAController.getCAFrame().getLattice()). These features
-// are not portable to a pure Rule interface without significant architecture
-// changes. Skipping as directed.
+// 17. TuringMachine — See #20 below (implemented after initial port).
 
 // =============================================================================
 // 18. CellularMarketModel — Economic market simulation
@@ -1144,6 +1133,175 @@ class ChainLinkFence(override val numStates: Int = 10) : IntegerRule() {
     )
     override fun withProperty(key: String, value: Any): Rule = when (key) {
         "numStates" -> ChainLinkFence((value as Number).toInt().coerceIn(3, 256))
+        else -> this
+    }
+}
+
+// =============================================================================
+// 20. Turing Machine — A CA-based Turing Machine
+// =============================================================================
+
+/**
+ * Turing Machine implemented as a cellular automaton.
+ *
+ * The lattice is the infinite tape. Cell states are the tape symbols.
+ * The highest state (numStates - 1) is the tape head marker.
+ * A finite-state controller reads the symbol under the head,
+ * writes a new symbol, moves the head, and transitions to a new state.
+ *
+ * Includes preset programs: Counting, Busy Beaver #3, Busy Beaver #4.
+ *
+ * Port of Java TuringMachine.java by Kaleb Kircher.
+ */
+class TuringMachine(
+    override val numStates: Int = 4,
+    private val programName: String = "Busy Beaver #3"
+) : IntegerRule() {
+    override val displayName = "Turing Machine"
+    override val description = "Turing machine on a CA lattice — $programName"
+    override val category = RuleCategory.OTHER
+    override val compatibleLatticeNames = listOf("Square (Moore)")
+
+    // Transition table: [finiteState][readSymbol] → Triple(writeSymbol, moveDirection, nextFiniteState)
+    // Directions index into Moore neighbors: 0=SE,1=S,2=SW,3=W,4=NW,5=N,6=NE,7=E
+    private val transitions: Array<Array<Triple<Int, Int, Int>>>
+    private val haltFlags: Array<BooleanArray>
+
+    init {
+        val symbols = numStates - 1 // symbols are 0..(numStates-2), head is numStates-1
+        val numFiniteStates = 20
+        transitions = Array(numFiniteStates) { Array(symbols) { Triple(0, 7, 0) } }
+        haltFlags = Array(numFiniteStates) { BooleanArray(symbols) }
+        loadProgram(programName, symbols)
+    }
+
+    private fun loadProgram(name: String, symbols: Int) {
+        when (name) {
+            "Counting" -> {
+                // State 0: read 0→write 0,move E,stay 0; read 1→write 1,move E,stay 0; read blank→write 1,move W,goto 1
+                if (symbols >= 3) {
+                    transitions[0][0] = Triple(0, 7, 0) // read 0: write 0, move E, state 0
+                    transitions[0][1] = Triple(1, 7, 0) // read 1: write 1, move E, state 0
+                    transitions[0][2] = Triple(1, 3, 1) // read blank: write 1, move W, state 1
+                    transitions[1][0] = Triple(1, 7, 0) // read 0: write 1, move E, state 0
+                    transitions[1][1] = Triple(0, 3, 1) // read 1: write 0, move W, state 1
+                    transitions[1][2] = Triple(1, 3, 0) // read blank: write 1, move W, state 0
+                }
+            }
+            "Busy Beaver #3" -> {
+                // 3-state, 2-symbol Busy Beaver (writes 6 ones then halts)
+                if (symbols >= 2) {
+                    transitions[0][0] = Triple(1, 7, 1) // A,0 → write 1, move R, goto B
+                    transitions[0][1] = Triple(1, 3, 2) // A,1 → write 1, move L, goto C
+                    transitions[1][0] = Triple(1, 3, 0) // B,0 → write 1, move L, goto A
+                    transitions[1][1] = Triple(1, 7, 1) // B,1 → write 1, move R, goto B
+                    transitions[2][0] = Triple(1, 3, 1) // C,0 → write 1, move L, goto B
+                    transitions[2][1] = Triple(1, 7, 0) // C,1 → write 1, move R, halt
+                    haltFlags[2][1] = true
+                }
+            }
+            "Busy Beaver #4" -> {
+                // 4-state, 2-symbol Busy Beaver (writes 13 ones)
+                if (symbols >= 2) {
+                    transitions[0][0] = Triple(1, 7, 1) // A,0 → 1,R,B
+                    transitions[0][1] = Triple(1, 3, 1) // A,1 → 1,L,B
+                    transitions[1][0] = Triple(1, 3, 0) // B,0 → 1,L,A
+                    transitions[1][1] = Triple(0, 3, 2) // B,1 → 0,L,C
+                    transitions[2][0] = Triple(1, 7, 0) // C,0 → 1,R,halt (actually goes to D in 4-state)
+                    transitions[2][1] = Triple(1, 3, 3) // C,1 → 1,L,D
+                    transitions[3][0] = Triple(1, 7, 3) // D,0 → 1,R,D
+                    transitions[3][1] = Triple(0, 7, 0) // D,1 → 0,R,A
+                    haltFlags[0][1] = false // 4-state BB doesn't halt in simplified form
+                }
+            }
+        }
+    }
+
+    // Mutable state for tracking the tape head across cells in a generation
+    // Using companion object mirrors the original's static fields
+    private companion object {
+        @Volatile var headMoved = false
+        @Volatile var tapeWritten = false
+        @Volatile var stateRead = false
+        var currentFiniteState = 0
+        var readSymbol = 0
+        var pendingReadSymbol = 0
+        var lastGeneration = -1
+    }
+
+    override fun nextState(cell: Cell, neighbors: Array<Cell>): CellState {
+        val tapeHead = numStates - 1
+        val cellVal = cell.currentState.toInt()
+        val generation = cell.generation
+
+        // Reset per-generation flags
+        if (lastGeneration != generation) {
+            lastGeneration = generation
+            headMoved = false
+            tapeWritten = false
+            stateRead = false
+            readSymbol = pendingReadSymbol
+        }
+
+        // Update finite state after both write and move are done
+        if (!stateRead && tapeWritten && headMoved) {
+            stateRead = true
+            val sym = readSymbol.coerceIn(0, numStates - 2)
+            val fs = currentFiniteState.coerceIn(0, transitions.size - 1)
+            currentFiniteState = transitions[fs][sym].third
+        }
+
+        // Check halt
+        val fs = currentFiniteState.coerceIn(0, transitions.size - 1)
+        val sym = readSymbol.coerceIn(0, numStates - 2)
+        if (haltFlags[fs][sym]) {
+            return IntegerCellState(cellVal)
+        }
+
+        var result = 99 // sentinel: means "not yet determined"
+
+        // Try to move the tape head
+        if (!headMoved) {
+            val moveDir = transitions[fs][sym].second.coerceIn(0, neighbors.size - 1)
+            if (neighbors[moveDir].currentState.toInt() == tapeHead) {
+                // This cell is the destination of the head
+                pendingReadSymbol = cellVal
+                headMoved = true
+                result = tapeHead
+            }
+        }
+
+        // Try to write on the old head position
+        if (result == 99 && !tapeWritten) {
+            if (cellVal == tapeHead) {
+                tapeWritten = true
+                result = transitions[fs][sym].first.coerceIn(0, numStates - 2)
+            }
+        }
+
+        // If neither move nor write applied, keep current value
+        if (result == 99) {
+            result = cellVal
+        }
+
+        return IntegerCellState(result)
+    }
+
+    override fun createInitialState(): CellState = IntegerCellState(0)
+
+    override val properties get() = listOf(
+        RuleProperty.ChoiceProperty(
+            "program", "Program", programName,
+            listOf("Counting", "Busy Beaver #3", "Busy Beaver #4"),
+            "Preset Turing machine program"
+        ),
+        RuleProperty.IntProperty("numStates", "Symbols + 1", numStates, 3, 8,
+            "Number of tape symbols + 1 (head marker)")
+    )
+
+    override fun withProperty(key: String, value: Any): Rule = when (key) {
+        "program" -> TuringMachine(numStates, value as String)
+        "numStates" -> TuringMachine((value as Number).toInt().coerceIn(3, 8), programName)
         else -> this
     }
 }

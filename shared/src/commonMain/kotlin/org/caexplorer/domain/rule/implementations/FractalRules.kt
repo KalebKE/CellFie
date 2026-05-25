@@ -98,25 +98,24 @@ class FractalIteration(
 
     override fun nextState(cell: Cell, neighbors: Array<Cell>): CellState {
         val state = Fractal.getComplex(cell)
+        val iteration = cell.generation
 
-        // real = iteration count, imaginary = current |z|
-        val iteration = state.real.toInt()
-
-        if (iteration >= maxIterations || state.imaginary > ESCAPE_RADIUS) {
+        // Already escaped or max iterations reached — freeze
+        if (state.modulus > ESCAPE_RADIUS || iteration >= maxIterations) {
             return Fractal.makeState(state)
         }
 
-        // Compute one iteration of z = z² + c from scratch to iteration+1
         val c = coordinateToComplex(cell.coordinate.row, cell.coordinate.col)
-        var z = Complex.ZERO
-        for (i in 0..iteration) {
-            z = z * z + c
-            if (z.modulus > ESCAPE_RADIUS) {
-                return Fractal.makeState(Complex(i.toDouble(), z.modulus))
-            }
+
+        // Incremental: z_{n+1} = z_n^2 + c  (O(1) per generation)
+        val zNext = state * state + c
+
+        if (zNext.modulus > ESCAPE_RADIUS) {
+            // Store escaped marker: encode iteration in the real part, modulus in imaginary
+            return Fractal.makeState(Complex(iteration.toDouble(), zNext.modulus))
         }
 
-        return Fractal.makeState(Complex((iteration + 1).toDouble(), z.modulus))
+        return Fractal.makeState(zNext)
     }
 
     override fun createInitialState(): CellState = Fractal.makeState(Complex.ZERO)
@@ -158,30 +157,27 @@ class FractalThreshold(
     override fun nextState(cell: Cell, neighbors: Array<Cell>): CellState {
         val state = Fractal.getComplex(cell)
 
-        // If already determined, keep the result
-        if (state.imaginary != 0.0) {
+        // Already determined — flag: imaginary > 2.0 (impossible during iteration since |z| ≤ 2)
+        if (state.imaginary > 2.0) {
             return Fractal.makeState(state)
         }
 
-        val c = coordinateToComplex(cell.coordinate.row, cell.coordinate.col)
-        val currentIter = state.real.toInt()
-
+        val currentIter = cell.generation
         if (currentIter >= maxIterations) {
             // Didn't escape: inside the set
-            return Fractal.makeState(Complex(0.0, 1.0))
+            return Fractal.makeState(Complex(0.0, DETERMINED_FLAG))
         }
 
-        // Run one more iteration
-        var z = Complex.ZERO
-        for (i in 0..currentIter) {
-            z = z * z + c
-            if (z.modulus > 2.0) {
-                // Escaped
-                return Fractal.makeState(Complex(1.0, 1.0))
-            }
+        val c = coordinateToComplex(cell.coordinate.row, cell.coordinate.col)
+
+        // Incremental: z_{n+1} = z_n^2 + c  (O(1) per generation)
+        val zNext = state * state + c
+        if (zNext.modulus > 2.0) {
+            // Escaped
+            return Fractal.makeState(Complex(1.0, DETERMINED_FLAG))
         }
 
-        return Fractal.makeState(Complex((currentIter + 1).toDouble(), 0.0))
+        return Fractal.makeState(zNext)
     }
 
     override fun createInitialState(): CellState = Fractal.makeState(Complex.ZERO)
@@ -190,6 +186,10 @@ class FractalThreshold(
         val real = centerReal + (col.toDouble() / gridSize - 0.5) * zoom
         val imag = centerImag + (row.toDouble() / gridSize - 0.5) * zoom
         return Complex(real, imag)
+    }
+
+    companion object {
+        private const val DETERMINED_FLAG = 3.0
     }
 }
 

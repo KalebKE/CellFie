@@ -91,9 +91,9 @@ class RuleTest {
     }
 
     @Test
-    fun forestFireHasThreeStates() {
+    fun forestFireHasEightStates() {
         val rule = ForestFire()
-        assertEquals(3, rule.numStates)
+        assertEquals(8, rule.numStates)
     }
 
     @Test

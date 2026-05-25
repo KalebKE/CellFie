@@ -1,5 +1,6 @@
 package org.caexplorer.desktop
 
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.MenuBar
 import androidx.compose.ui.window.Window
@@ -12,6 +13,7 @@ fun main() = application {
     Window(
         onCloseRequest = ::exitApplication,
         title = "CellFie",
+        icon = painterResource("icon.png"),
         state = rememberWindowState(width = 1280.dp, height = 900.dp)
     ) {
         MenuBar {

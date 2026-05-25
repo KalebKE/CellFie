@@ -351,7 +351,53 @@ class MajorityVote(
 // =============================================================================
 
 /**
- * Neural Net CA using a Lenia-inspired growth function.
+ * Neural network CA — sigmoid-threshold model.
+ * Each cell computes a weighted sum of neighbor states, applies
+ * a sigmoid activation, and thresholds to produce the next state.
+ * Port of original Java NeuralNet.
+ */
+class NeuralNet(override val numStates: Int = 8) : IntegerRule() {
+    override val displayName = "Neural Net"
+    override val description = "Sigmoid neural network with threshold activation"
+    override val category = RuleCategory.NEURAL
+    override val compatibleLatticeNames = listOf("Square (Moore)")
+
+    override fun nextState(cell: Cell, neighbors: Array<Cell>): CellState {
+        val maxState = numStates - 1
+        if (maxState <= 0) return cell.currentState
+
+        // Weighted sum of neighbor activations (unit weights)
+        var sum = 0.0
+        for (n in neighbors) {
+            sum += n.currentState.toInt().toDouble() / maxState
+        }
+
+        // Sigmoid activation: 1 / (1 + exp(-gain * (sum - threshold)))
+        val threshold = neighbors.size / 2.0
+        val gain = 4.0
+        val activation = 1.0 / (1.0 + kotlin.math.exp(-gain * (sum - threshold)))
+
+        val newState = kotlin.math.round(activation * maxState).toInt().coerceIn(0, maxState)
+        return IntegerCellState(newState)
+    }
+
+    override fun createInitialState(): CellState = IntegerCellState(0)
+
+    override val properties get() = listOf(
+        RuleProperty.IntProperty("numStates", "States", numStates, 2, 256, "Number of cell states")
+    )
+    override fun withProperty(key: String, value: Any): Rule = when (key) {
+        "numStates" -> NeuralNet((value as Number).toInt().coerceIn(2, 256))
+        else -> this
+    }
+}
+
+// =============================================================================
+// Lenia Growth CA
+// =============================================================================
+
+/**
+ * Lenia Growth CA using a Lenia-inspired growth function.
  *
  * Instead of a simple sigmoid, uses a bell-curve growth function centered
  * at a target neighborhood activation level. The state is updated additively
@@ -370,8 +416,8 @@ class NeuralNetCA(
     val dt: Float = 0.12f,
     val noise: Float = 0.01f
 ) : IntegerRule() {
-    override val displayName = "Neural Net"
-    override val description = "Lenia-inspired growth: flowing organic patterns that self-organize"
+    override val displayName = "Lenia Growth"
+    override val description = "Lenia-inspired continuous growth with flowing organic patterns"
     override val category = RuleCategory.NEURAL
     override val compatibleLatticeNames = listOf("Square (Moore)")
 

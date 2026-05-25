@@ -132,11 +132,10 @@ object RuleRegistry {
         register(CoolClassIV())
         register(PrettyClassIV())
         register(SatansStaircase())
-        // TuringMachine skipped: 1733-line Java rule with GUI-dependent global state,
-        // not portable to pure Rule interface. LangtonsAnt already provides a 2D Turing machine.
         register(CellularMarketModel())
         register(RealSort())
         register(ChainLinkFence())
+        register(TuringMachine())
     }
 
     fun register(rule: Rule) {
