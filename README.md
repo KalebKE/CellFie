@@ -1,5 +1,7 @@
 <p align="center">
   <img src="cellfie-selfie.svg" width="128" height="128" alt="CellFie icon">
+  <br>
+  <img src="screenshots/screenshot-2026-05-25-11-11-02.png" width="820" alt="CellFie screenshot">
 </p>
 
 <h1 align="center">CellFie</h1>
