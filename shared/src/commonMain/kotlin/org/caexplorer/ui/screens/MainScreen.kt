@@ -621,6 +621,7 @@ fun MainScreen(
         LaunchedEffect(Unit) { focusRequester.requestFocus() }
 
         Scaffold(
+            containerColor = Color(0xFF0D0909),
             topBar = {
                 TopAppBar(
                     title = {
