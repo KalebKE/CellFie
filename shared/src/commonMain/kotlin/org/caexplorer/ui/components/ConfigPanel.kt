@@ -78,6 +78,7 @@ fun ConfigPanel(
     onPaletteChanged: (AppPalette) -> Unit = {},
     currentRule: Rule? = null,
     onRuleChanged: ((Rule) -> Unit)? = null,
+    onOpenRulePicker: () -> Unit = {},
     onResetSimulation: () -> Unit,
     onDismiss: () -> Unit,
     trailEnabled: Boolean = false,
@@ -112,7 +113,6 @@ fun ConfigPanel(
     var speedExpanded by remember { mutableStateOf(true) }
     var initPatternExpanded by remember { mutableStateOf(true) }
     var gridSizeExpanded by remember { mutableStateOf(true) }
-    var rulePropsExpanded by remember { mutableStateOf(true) }
     var renderFxExpanded by remember { mutableStateOf(true) }
     var voxelOpacityExpanded by remember { mutableStateOf(true) }
 
@@ -140,6 +140,72 @@ fun ConfigPanel(
         }
 
         HorizontalDivider()
+
+        // --- Current Rule (always visible, first section) ---
+        if (currentRule != null) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    Icons.Default.AutoAwesome,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp),
+                    tint = MaterialTheme.colorScheme.primary
+                )
+                Text(
+                    "Rule",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+
+            // Rule name + category
+            OutlinedCard(modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    Text(
+                        currentRule.displayName,
+                        style = MaterialTheme.typography.titleSmall
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    SuggestionChip(
+                        onClick = {},
+                        label = { Text(currentRule.category.displayName) },
+                        colors = SuggestionChipDefaults.suggestionChipColors(
+                            containerColor = MaterialTheme.colorScheme.primaryContainer,
+                            labelColor = MaterialTheme.colorScheme.onPrimaryContainer
+                        ),
+                        modifier = Modifier.height(24.dp)
+                    )
+                }
+            }
+
+            // Change Rule button
+            Button(
+                onClick = onOpenRulePicker,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(
+                    Icons.Default.SwapHoriz,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(Modifier.width(8.dp))
+                Text("Change Rule")
+            }
+
+            HorizontalDivider()
+
+            // Rule properties (always visible)
+            if (onRuleChanged != null) {
+                RulePropertiesPanel(
+                    rule = currentRule,
+                    onRuleChanged = onRuleChanged
+                )
+                HorizontalDivider()
+            }
+        }
 
         // --- App Theme ---
         SectionHeader("App Theme", appThemeExpanded) { appThemeExpanded = !appThemeExpanded }
@@ -629,23 +695,6 @@ fun ConfigPanel(
         }
 
         HorizontalDivider()
-
-        // --- Rule Properties ---
-        if (currentRule != null && onRuleChanged != null) {
-            SectionHeader("Rule Properties", rulePropsExpanded) { rulePropsExpanded = !rulePropsExpanded }
-            AnimatedVisibility(
-                visible = rulePropsExpanded,
-                enter = expandVertically(),
-                exit = shrinkVertically()
-            ) {
-                RulePropertiesPanel(
-                    rule = currentRule,
-                    onRuleChanged = onRuleChanged
-                )
-            }
-
-            HorizontalDivider()
-        }
 
         // --- Reset Button ---
         Button(

@@ -951,6 +951,7 @@ fun MainScreen(
                                     currentRule = newRule
                                     resetKey++
                                 },
+                                onOpenRulePicker = { showRulePicker = true },
                                 onResetSimulation = { engine.stop(); resetKey++ },
                                 onDismiss = { showConfig = false },
                                 trailEnabled = trailEnabled,

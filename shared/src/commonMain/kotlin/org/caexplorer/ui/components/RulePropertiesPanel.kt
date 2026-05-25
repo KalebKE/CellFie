@@ -15,6 +15,8 @@ import androidx.compose.ui.unit.dp
 import org.caexplorer.domain.rule.IntegerRule
 import org.caexplorer.domain.rule.Rule
 import org.caexplorer.domain.rule.RuleProperty
+import org.caexplorer.domain.rule.implementations.WolframRule
+import androidx.compose.ui.text.font.FontWeight
 import kotlin.math.roundToInt
 
 /**
@@ -35,24 +37,46 @@ fun RulePropertiesPanel(
         OutlinedCard(modifier = Modifier.fillMaxWidth()) {
             Column(
                 modifier = Modifier.padding(12.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
+                verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                Text(
-                    rule.displayName,
-                    style = MaterialTheme.typography.titleSmall
-                )
-                Text(
-                    rule.description,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                // Prominent rule number for Wolfram and OuterTotalistic rules
+                when (rule) {
+                    is WolframRule -> {
+                        Text(
+                            "Rule #${rule.ruleNumber}",
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                    else -> {
+                        Text(
+                            rule.displayName,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+                // Description
+                if (rule.description.isNotBlank()) {
+                    Text(
+                        rule.description,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                // Category badge and state count
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    AssistChip(
+                    SuggestionChip(
                         onClick = {},
                         label = { Text(rule.category.displayName) },
+                        colors = SuggestionChipDefaults.suggestionChipColors(
+                            containerColor = MaterialTheme.colorScheme.primaryContainer,
+                            labelColor = MaterialTheme.colorScheme.onPrimaryContainer
+                        ),
                         modifier = Modifier.height(28.dp)
                     )
                     if (rule is IntegerRule) {
@@ -87,6 +111,29 @@ fun RulePropertiesPanel(
                 )
             }
         } else {
+            // Configure section header
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    Icons.Default.Tune,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp),
+                    tint = MaterialTheme.colorScheme.primary
+                )
+                Text(
+                    "Configure",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+            HorizontalDivider(
+                modifier = Modifier.padding(bottom = 4.dp),
+                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
+            )
             properties.forEach { property ->
                 when (property) {
                     is RuleProperty.IntProperty -> IntPropertyControl(
