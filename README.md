@@ -13,6 +13,27 @@ Over 300 rules across 14 categories — from Wolfram elementary automata to Turi
 
 ---
 
+## Screenshots
+
+<p align="center">
+  <img src="screenshots/rule_30.png" width="280" alt="Rule 30">&nbsp;&nbsp;
+  <img src="screenshots/rule_90.png" width="280" alt="Rule 90">&nbsp;&nbsp;
+  <img src="screenshots/rule_110.png" width="280" alt="Rule 110">
+</p>
+
+<p align="center">
+  <img src="screenshots/game_of_life.png" width="280" alt="Game of Life">&nbsp;&nbsp;
+  <img src="screenshots/langtons_ant.png" width="280" alt="Langton's Ant">&nbsp;&nbsp;
+  <img src="screenshots/brians_brain.png" width="280" alt="Brian's Brain">
+</p>
+
+<p align="center">
+  <img src="screenshots/cyclic_ca.png" width="400" alt="Cyclic CA">&nbsp;&nbsp;
+  <img src="screenshots/screenshot-2026-05-25-11-11-02.png" width="400" alt="Lenia Growth">
+</p>
+
+---
+
 ## What Is a Cellular Automaton?
 
 A **cellular automaton** (CA) is a grid of cells, each in one of a finite number of states. At each time step, every cell simultaneously updates its state based on a simple rule that considers the cell and its neighbors. Despite the simplicity of the rules, CAs can produce extraordinarily complex behavior — chaos, self-organization, computation, and even life-like dynamics.
