@@ -165,10 +165,10 @@ fun MainScreen(
         mutableStateOf(AppSettings.getInt(SettingsKeys.LAST_COLOR_SCHEME, 0).coerceIn(0, ALL_COLOR_SCHEMES.lastIndex))
     }
 
-    // Rule selection
-    val rules = remember { RuleRegistry.getFeaturedRules() }
+    // Rule selection — include all rules (Wolfram elementary + featured)
+    val rules = remember { RuleRegistry.getAll() }
     var selectedRuleIndex by remember {
-        mutableStateOf(AppSettings.getInt(SettingsKeys.LAST_RULE_INDEX, 0).coerceIn(0, RuleRegistry.getFeaturedRules().lastIndex))
+        mutableStateOf(AppSettings.getInt(SettingsKeys.LAST_RULE_INDEX, 0).coerceIn(0, RuleRegistry.getAll().lastIndex))
     }
 
     // Current rule instance (may differ from rules[selectedRuleIndex] if properties were changed)
