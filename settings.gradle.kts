@@ -13,7 +13,7 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "CAExplorerMP"
+rootProject.name = "CellFie"
 
 include(":shared")
 include(":desktopApp")
