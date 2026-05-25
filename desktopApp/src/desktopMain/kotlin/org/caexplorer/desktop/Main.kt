@@ -9,7 +9,11 @@ import androidx.compose.ui.window.rememberWindowState
 import org.caexplorer.ui.App
 import org.caexplorer.ui.AppActions
 
-fun main() = application {
+fun main() {
+    // Force dark appearance for the macOS native title bar
+    System.setProperty("apple.awt.application.appearance", "NSAppearanceNameDarkAqua")
+
+    application {
     Window(
         onCloseRequest = ::exitApplication,
         title = "CellFie",
@@ -52,5 +56,6 @@ fun main() = application {
             }
         }
         App()
+    }
     }
 }
