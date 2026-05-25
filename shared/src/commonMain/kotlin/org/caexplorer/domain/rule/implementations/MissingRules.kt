@@ -1162,15 +1162,23 @@ class ChainLinkFence(override val numStates: Int = 10) : IntegerRule() {
  */
 class TuringMachine(
     override val numStates: Int = 4,
-    private val programName: String = "Counting"
+    private val programName: String = "Counting",
+    private val bbStates: Int = 3
 ) : IntegerRule() {
     override val displayName = "Turing Machine"
     override val description: String get() {
-        val halts = programName in listOf(
-            "Busy Beaver #1", "Busy Beaver #2",
-            "Classic BB-3", "Classic BB-4",
-            "Subtraction"
-        )
+        if (programName == "Busy Beaver") {
+            val info = when (bbStates) {
+                1 -> "1 mark, halts in 1 step"
+                2 -> "4 marks, halts in 6 steps"
+                3 -> "6 marks, halts in 21 steps"
+                4 -> "13 marks, halts in 107 steps"
+                5 -> "4098 marks, halts in ~47M steps"
+                else -> "halts after finite steps"
+            }
+            return "Classic Busy Beaver — $bbStates-state ($info)"
+        }
+        val halts = programName == "Subtraction"
         val suffix = if (halts) " (halts after finite steps)" else ""
         return "Turing machine on a CA lattice — $programName$suffix"
     }
@@ -1221,14 +1229,12 @@ class TuringMachine(
 
         val ALL_PROGRAMS = listOf(
             "Counting", "Bouncing Line", "Staircase", "Expanding Square",
-            "Binary Counter",
-            "Busy Beaver #1", "Busy Beaver #2",
-            "Classic BB-3", "Classic BB-4",
+            "Binary Counter", "Busy Beaver",
             "Subtraction"
         )
 
         fun recommendedStates(program: String): Int = when (program) {
-            "Counting", "Subtraction", "Busy Beaver #1", "Busy Beaver #2" -> 4
+            "Counting", "Subtraction" -> 4
             else -> 3
         }
     }
@@ -1240,6 +1246,14 @@ class TuringMachine(
         halted = false
         lastGeneration = -1
         stateUpdated = false
+
+        // Reserve state 19 as a universal HALT state.
+        // The halting transition writes+moves normally, then transitions to
+        // HALT_STATE. On the NEXT generation, the halt flag fires and freezes.
+        val HALT = 19
+        for (s in 0 until numStates - 1) {
+            haltFlags[HALT][s] = true
+        }
 
         when (name) {
             // ── Original CAExplorer programs (3-symbol) ───────────────────
@@ -1281,58 +1295,67 @@ class TuringMachine(
                 transitions[8][0] = Triple(0, W, 8)
                 transitions[8][1] = Triple(0, E, 0)
                 transitions[8][2] = Triple(2, E, 4)
-                transitions[9][0] = Triple(0, E, 9); haltFlags[9][0] = true
-                transitions[9][1] = Triple(1, E, 9); haltFlags[9][1] = true
-                transitions[9][2] = Triple(0, E, 9); haltFlags[9][2] = true
+                transitions[9][0] = Triple(0, E, HALT)
+                transitions[9][1] = Triple(1, E, HALT)
+                transitions[9][2] = Triple(0, E, HALT)
             }
 
-            "Busy Beaver #1" -> if (symbols >= 3) {
-                transitions[0][0] = Triple(1, E, 1)
-                transitions[0][1] = Triple(1, E, 0); haltFlags[0][1] = true
-                transitions[0][2] = Triple(1, E, 1)
-                transitions[1][0] = Triple(0, E, 2)
-                transitions[1][1] = Triple(1, E, 1)
-                transitions[1][2] = Triple(0, E, 2)
-                transitions[2][0] = Triple(1, W, 2)
-                transitions[2][1] = Triple(1, W, 0)
-                transitions[2][2] = Triple(1, W, 2)
-            }
+            // ── Classic 2-symbol Busy Beavers (champion machines) ─────────
+            // All use binary tape (symbols=2). The bbStates parameter selects
+            // the number of TM finite-control states.
 
-            "Busy Beaver #2" -> if (symbols >= 3) {
-                transitions[0][0] = Triple(1, E, 1)
-                transitions[0][1] = Triple(1, W, 1)
-                transitions[0][2] = Triple(1, E, 1)
-                transitions[1][0] = Triple(1, W, 0)
-                transitions[1][1] = Triple(0, W, 2)
-                transitions[1][2] = Triple(1, W, 0)
-                transitions[2][0] = Triple(1, W, 2); haltFlags[2][0] = true
-                transitions[2][1] = Triple(1, W, 3)
-                transitions[2][2] = Triple(1, W, 2); haltFlags[2][2] = true
-                transitions[3][0] = Triple(1, E, 3)
-                transitions[3][1] = Triple(0, E, 0)
-                transitions[3][2] = Triple(1, E, 3)
-            }
+            "Busy Beaver" -> if (symbols >= 2) {
+                when (bbStates) {
+                    // BB(1): writes 1 mark, halts in 1 step
+                    1 -> {
+                        transitions[0][0] = Triple(1, E, HALT)
+                    }
 
-            // ── Classic 2-symbol Busy Beavers ─────────────────────────────
+                    // BB(2): writes 4 ones, halts in 6 steps
+                    2 -> {
+                        transitions[0][0] = Triple(1, E, 1)
+                        transitions[0][1] = Triple(1, W, 1)
+                        transitions[1][0] = Triple(1, W, 0)
+                        transitions[1][1] = Triple(1, E, HALT)
+                    }
 
-            "Classic BB-3" -> if (symbols >= 2) {
-                transitions[0][0] = Triple(1, E, 1)
-                transitions[0][1] = Triple(1, W, 2)
-                transitions[1][0] = Triple(1, W, 0)
-                transitions[1][1] = Triple(1, E, 1)
-                transitions[2][0] = Triple(1, W, 1)
-                transitions[2][1] = Triple(1, E, 0); haltFlags[2][1] = true
-            }
+                    // BB(3): writes 6 ones, halts in 21 steps
+                    3 -> {
+                        transitions[0][0] = Triple(1, E, 1)
+                        transitions[0][1] = Triple(1, W, 2)
+                        transitions[1][0] = Triple(1, W, 0)
+                        transitions[1][1] = Triple(1, E, 1)
+                        transitions[2][0] = Triple(1, W, 1)
+                        transitions[2][1] = Triple(1, E, HALT)
+                    }
 
-            "Classic BB-4" -> if (symbols >= 2) {
-                transitions[0][0] = Triple(1, E, 1)
-                transitions[0][1] = Triple(1, W, 1)
-                transitions[1][0] = Triple(1, W, 0)
-                transitions[1][1] = Triple(0, W, 2)
-                transitions[2][0] = Triple(1, E, 3)
-                transitions[2][1] = Triple(1, W, 3)
-                transitions[3][0] = Triple(1, E, 0)
-                transitions[3][1] = Triple(0, E, 0); haltFlags[3][1] = true
+                    // BB(4): writes 13 ones, halts in 107 steps
+                    4 -> {
+                        transitions[0][0] = Triple(1, E, 1)
+                        transitions[0][1] = Triple(1, W, 1)
+                        transitions[1][0] = Triple(1, W, 0)
+                        transitions[1][1] = Triple(0, W, 2)
+                        transitions[2][0] = Triple(1, E, HALT)
+                        transitions[2][1] = Triple(1, W, 3)
+                        transitions[3][0] = Triple(1, E, 3)
+                        transitions[3][1] = Triple(0, E, 0)
+                    }
+
+                    // BB(5): Marxen–Buntrock champion
+                    // writes 4098 ones, halts in 47,176,870 steps
+                    5 -> {
+                        transitions[0][0] = Triple(1, E, 1)
+                        transitions[0][1] = Triple(1, W, 2)
+                        transitions[1][0] = Triple(1, E, 2)
+                        transitions[1][1] = Triple(1, E, 1)
+                        transitions[2][0] = Triple(1, E, 3)
+                        transitions[2][1] = Triple(0, W, 4)
+                        transitions[3][0] = Triple(1, W, 0)
+                        transitions[3][1] = Triple(1, W, 3)
+                        transitions[4][0] = Triple(1, E, HALT)
+                        transitions[4][1] = Triple(0, W, 0)
+                    }
+                }
             }
 
             // ── 2D programs ───────────────────────────────────────────────
@@ -1461,20 +1484,33 @@ class TuringMachine(
 
     override fun createInitialState(): CellState = IntegerCellState(0)
 
-    override val properties get() = listOf(
-        RuleProperty.ChoiceProperty(
+    override val properties get() = buildList {
+        add(RuleProperty.ChoiceProperty(
             "program", "Program", programName,
             ALL_PROGRAMS,
             "Preset Turing machine program"
-        ),
-        RuleProperty.IntProperty("numStates", "Symbols + 1", numStates, 3, 8,
-            "Number of tape symbols + 1 (head marker)")
-    )
+        ))
+        if (programName == "Busy Beaver") {
+            add(RuleProperty.IntProperty("bbStates", "TM States", bbStates, 1, 5,
+                "Number of Turing machine finite-control states (1–5)"))
+        } else {
+            add(RuleProperty.IntProperty("numStates", "Symbols + 1", numStates, 3, 8,
+                "Number of tape symbols + 1 (head marker)"))
+        }
+    }
 
     override fun withProperty(key: String, value: Any): Rule = when (key) {
         "program" -> {
             val prog = value as String
-            TuringMachine(recommendedStates(prog), prog)
+            if (prog == "Busy Beaver") {
+                TuringMachine(3, prog, bbStates)
+            } else {
+                TuringMachine(recommendedStates(prog), prog)
+            }
+        }
+        "bbStates" -> {
+            val n = (value as Number).toInt().coerceIn(1, 5)
+            TuringMachine(3, "Busy Beaver", n)
         }
         "numStates" -> TuringMachine((value as Number).toInt().coerceIn(3, 8), programName)
         else -> this

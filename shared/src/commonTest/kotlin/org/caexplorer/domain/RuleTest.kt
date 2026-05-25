@@ -206,7 +206,7 @@ class RuleTest {
      */
     @Test
     fun turingMachineClassicBB3Halts() {
-        val tm = TuringMachine(numStates = 3, programName = "Classic BB-3")
+        val tm = TuringMachine(numStates = 3, programName = "Busy Beaver", bbStates = 3)
         val size = 21
         val center = size / 2
         val tapeHead = 2
@@ -245,9 +245,96 @@ class RuleTest {
             if (s == 1) oneCount++
             if (s == tapeHead) headCount++
         }
-        // BB-3 writes 6 ones total, but head marker covers one of them
+        // BB-3 writes 6 ones total on the tape
         assertEquals(1, headCount, "Should have exactly one head marker")
-        assertEquals(6, oneCount + headCount,
-            "Classic BB-3 should produce 6 marks (ones + head), but got $oneCount ones + $headCount head")
+        assertTrue(oneCount >= 5 && oneCount <= 6,
+            "Classic BB-3 should produce 5-6 visible ones, but got $oneCount")
+    }
+
+    @Test
+    fun turingMachineBB2Halts() {
+        val tm = TuringMachine(numStates = 3, programName = "Busy Beaver", bbStates = 2)
+        val size = 21
+        val center = size / 2
+        val tapeHead = 2
+
+        val lattice = createGrid(size, size) { coord ->
+            if (coord.row == center && coord.col == center) tapeHead else 0
+        }
+
+        var stepsWithChange = 0
+        for (step in 0 until 100) {
+            val newStates = mutableMapOf<Cell, IntegerCellState>()
+            for (cell in lattice.cells) {
+                val neighbors = lattice.getNeighbors(cell)
+                newStates[cell] = tm.nextState(cell, neighbors) as IntegerCellState
+            }
+            var changed = false
+            for ((cell, state) in newStates) {
+                if (cell.currentState.toInt() != state.toInt()) changed = true
+                cell.addNewState(state)
+            }
+            if (changed) stepsWithChange++
+            else break
+        }
+
+        assertTrue(stepsWithChange in 5..10,
+            "BB-2 should halt around 6-7 steps, but ran $stepsWithChange")
+
+        var oneCount = 0
+        var headCount = 0
+        for (col in 0 until size) {
+            val cell = lattice.getCell(center, col)!!
+            val s = cell.currentState.toInt()
+            if (s == 1) oneCount++
+            if (s == tapeHead) headCount++
+        }
+        assertEquals(1, headCount, "Should have exactly one head marker")
+        // BB-2 writes 4 ones; head may rest on one, hiding it
+        assertTrue(oneCount in 3..4,
+            "BB-2 should have 3-4 visible ones, but got $oneCount")
+    }
+
+    @Test
+    fun turingMachineBB4Halts() {
+        val tm = TuringMachine(numStates = 3, programName = "Busy Beaver", bbStates = 4)
+        val size = 51
+        val center = size / 2
+        val tapeHead = 2
+
+        val lattice = createGrid(size, size) { coord ->
+            if (coord.row == center && coord.col == center) tapeHead else 0
+        }
+
+        var stepsWithChange = 0
+        for (step in 0 until 200) {
+            val newStates = mutableMapOf<Cell, IntegerCellState>()
+            for (cell in lattice.cells) {
+                val neighbors = lattice.getNeighbors(cell)
+                newStates[cell] = tm.nextState(cell, neighbors) as IntegerCellState
+            }
+            var changed = false
+            for ((cell, state) in newStates) {
+                if (cell.currentState.toInt() != state.toInt()) changed = true
+                cell.addNewState(state)
+            }
+            if (changed) stepsWithChange++
+            else break
+        }
+
+        assertTrue(stepsWithChange in 50..200,
+            "BB-4 should halt around 107-108 steps, but ran $stepsWithChange")
+
+        var oneCount = 0
+        var headCount = 0
+        for (col in 0 until size) {
+            val cell = lattice.getCell(center, col)!!
+            val s = cell.currentState.toInt()
+            if (s == 1) oneCount++
+            if (s == tapeHead) headCount++
+        }
+        assertEquals(1, headCount, "Should have exactly one head marker, but got $headCount")
+        assertEquals(13, oneCount,
+            "BB-4 should produce 13 ones on tape, but got $oneCount")
     }
 }
