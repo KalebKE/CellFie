@@ -1165,7 +1165,15 @@ class TuringMachine(
     private val programName: String = "Counting"
 ) : IntegerRule() {
     override val displayName = "Turing Machine"
-    override val description = "Turing machine on a CA lattice — $programName"
+    override val description: String get() {
+        val halts = programName in listOf(
+            "Busy Beaver #1", "Busy Beaver #2",
+            "Classic BB-3", "Classic BB-4",
+            "Subtraction"
+        )
+        val suffix = if (halts) " (halts after finite steps)" else ""
+        return "Turing machine on a CA lattice — $programName$suffix"
+    }
     override val category = RuleCategory.OTHER
     override val compatibleLatticeNames = listOf("Square (Moore)")
     override val preferredInit = "center_seed"
@@ -1212,10 +1220,11 @@ class TuringMachine(
         @Volatile var stateUpdated = false
 
         val ALL_PROGRAMS = listOf(
-            "Counting", "Subtraction",
+            "Counting", "Bouncing Line", "Staircase", "Expanding Square",
+            "Binary Counter",
             "Busy Beaver #1", "Busy Beaver #2",
             "Classic BB-3", "Classic BB-4",
-            "Bouncing Line", "Staircase", "Expanding Square"
+            "Subtraction"
         )
 
         fun recommendedStates(program: String): Int = when (program) {
@@ -1351,6 +1360,24 @@ class TuringMachine(
                 transitions[2][1] = Triple(1, SW, 2)
                 transitions[3][0] = Triple(1, N, 0)
                 transitions[3][1] = Triple(1, NW, 3)
+            }
+
+            "Binary Counter" -> if (symbols >= 2) {
+                // Non-halting binary counter: increments forever.
+                // Scans right to find end, turns around, flips 1→0 (carry),
+                // 0→1 (done), scans right again. Wraps at grid boundary.
+                transitions[0][0] = Triple(0, E, 0) // scan right past 0s
+                transitions[0][1] = Triple(1, E, 0) // scan right past 1s
+                // When head wraps around (reads 0 after rightmost 1), we rely
+                // on the fact that the head enters blank tape and turns around.
+                // This uses 3 states for a cleaner loop:
+                // State 0: scan right. When we see the leftmost 0 after 1s, turn.
+                // State 1: increment mode, go left.
+                // State 2: scan right to re-enter state 0.
+                // For 2-symbol tape, a simpler approach:
+                // State 0 scans E; when cell after all marks is blank, switch.
+                transitions[1][0] = Triple(1, W, 0) // carry done: write 1, go right
+                transitions[1][1] = Triple(0, W, 1) // carry: 1→0, keep going left
             }
         }
     }

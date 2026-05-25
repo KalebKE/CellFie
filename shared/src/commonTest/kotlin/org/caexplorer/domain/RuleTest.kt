@@ -198,4 +198,56 @@ class RuleTest {
         assertEquals(1, headCount, "Should have exactly one tape head (reverse order)")
         assertTrue(oneCount > 0, "Should have written 1s on the tape (reverse order)")
     }
+
+    /**
+     * Test that Classic BB-3 (3-state, 2-symbol Busy Beaver) runs for multiple
+     * generations before halting. It should write exactly 6 ones on the tape.
+     * Busy Beavers are deterministic and SHOULD halt — that's their defining property.
+     */
+    @Test
+    fun turingMachineClassicBB3Halts() {
+        val tm = TuringMachine(numStates = 3, programName = "Classic BB-3")
+        val size = 21
+        val center = size / 2
+        val tapeHead = 2
+
+        val lattice = createGrid(size, size) { coord ->
+            if (coord.row == center && coord.col == center) tapeHead else 0
+        }
+
+        // Run up to 100 generations, counting how many actually change something
+        var stepsWithChange = 0
+        for (step in 0 until 100) {
+            val newStates = mutableMapOf<Cell, IntegerCellState>()
+            for (cell in lattice.cells) {
+                val neighbors = lattice.getNeighbors(cell)
+                newStates[cell] = tm.nextState(cell, neighbors) as IntegerCellState
+            }
+            var changed = false
+            for ((cell, state) in newStates) {
+                if (cell.currentState.toInt() != state.toInt()) changed = true
+                cell.addNewState(state)
+            }
+            if (changed) stepsWithChange++
+            else break
+        }
+
+        // BB-3 should run for at least 5 generations (it halts around 12-14)
+        assertTrue(stepsWithChange >= 5,
+            "BB-3 should run for multiple steps, but only ran $stepsWithChange")
+
+        // Count ones on the center row (head marker hides one 1 underneath)
+        var oneCount = 0
+        var headCount = 0
+        for (col in 0 until size) {
+            val cell = lattice.getCell(center, col)!!
+            val s = cell.currentState.toInt()
+            if (s == 1) oneCount++
+            if (s == tapeHead) headCount++
+        }
+        // BB-3 writes 6 ones total, but head marker covers one of them
+        assertEquals(1, headCount, "Should have exactly one head marker")
+        assertEquals(6, oneCount + headCount,
+            "Classic BB-3 should produce 6 marks (ones + head), but got $oneCount ones + $headCount head")
+    }
 }
