@@ -3,6 +3,7 @@ package org.caexplorer.ui.screens
 import androidx.compose.animation.*
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.*
@@ -25,6 +26,8 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.unit.dp
+import caexplorermp.shared.generated.resources.Res
+import caexplorermp.shared.generated.resources.app_icon
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.caexplorer.analysis.AnalysisRegistry
@@ -625,7 +628,17 @@ fun MainScreen(
             topBar = {
                 TopAppBar(
                     title = {
-                        Text("CellFie")
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("CellFie")
+                            Spacer(Modifier.width(8.dp))
+                            Image(
+                                painter = org.jetbrains.compose.resources.painterResource(
+                                    Res.drawable.app_icon
+                                ),
+                                contentDescription = "CellFie logo",
+                                modifier = Modifier.size(28.dp)
+                            )
+                        }
                     },
                     actions = {
                         // Status badge with animated color and proper icons
