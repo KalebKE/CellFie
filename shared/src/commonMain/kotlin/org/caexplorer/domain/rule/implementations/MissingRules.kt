@@ -1149,13 +1149,14 @@ class ChainLinkFence(override val numStates: Int = 10) : IntegerRule() {
  * A finite-state controller reads the symbol under the head,
  * writes a new symbol, moves the head, and transitions to a new state.
  *
- * Includes preset programs: Counting, Busy Beaver #3, Busy Beaver #4.
+ * Includes original preset programs (Counting, Subtraction, Busy Beaver #1/#2),
+ * classic Busy Beavers, and 2D programs that exploit the Moore neighborhood.
  *
- * Port of Java TuringMachine.java by Kaleb Kircher.
+ * Port of Java TuringMachine.java by Kaleb Kircher, extended with new programs.
  */
 class TuringMachine(
     override val numStates: Int = 4,
-    private val programName: String = "Busy Beaver #3"
+    private val programName: String = "Counting"
 ) : IntegerRule() {
     override val displayName = "Turing Machine"
     override val description = "Turing machine on a CA lattice — $programName"
@@ -1163,63 +1164,23 @@ class TuringMachine(
     override val compatibleLatticeNames = listOf("Square (Moore)")
 
     // Transition table: [finiteState][readSymbol] → Triple(writeSymbol, moveDirection, nextFiniteState)
-    // Directions index into Moore neighbors: 0=SE,1=S,2=SW,3=W,4=NW,5=N,6=NE,7=E
+    // Moore neighbor directions: 0=SE, 1=S, 2=SW, 3=W, 4=NW, 5=N, 6=NE, 7=E
     private val transitions: Array<Array<Triple<Int, Int, Int>>>
     private val haltFlags: Array<BooleanArray>
 
     init {
-        val symbols = numStates - 1 // symbols are 0..(numStates-2), head is numStates-1
+        val symbols = numStates - 1
         val numFiniteStates = 20
         transitions = Array(numFiniteStates) { Array(symbols) { Triple(0, 7, 0) } }
         haltFlags = Array(numFiniteStates) { BooleanArray(symbols) }
         loadProgram(programName, symbols)
     }
 
-    private fun loadProgram(name: String, symbols: Int) {
-        when (name) {
-            "Counting" -> {
-                // State 0: read 0→write 0,move E,stay 0; read 1→write 1,move E,stay 0; read blank→write 1,move W,goto 1
-                if (symbols >= 3) {
-                    transitions[0][0] = Triple(0, 7, 0) // read 0: write 0, move E, state 0
-                    transitions[0][1] = Triple(1, 7, 0) // read 1: write 1, move E, state 0
-                    transitions[0][2] = Triple(1, 3, 1) // read blank: write 1, move W, state 1
-                    transitions[1][0] = Triple(1, 7, 0) // read 0: write 1, move E, state 0
-                    transitions[1][1] = Triple(0, 3, 1) // read 1: write 0, move W, state 1
-                    transitions[1][2] = Triple(1, 3, 0) // read blank: write 1, move W, state 0
-                }
-            }
-            "Busy Beaver #3" -> {
-                // 3-state, 2-symbol Busy Beaver (writes 6 ones then halts)
-                if (symbols >= 2) {
-                    transitions[0][0] = Triple(1, 7, 1) // A,0 → write 1, move R, goto B
-                    transitions[0][1] = Triple(1, 3, 2) // A,1 → write 1, move L, goto C
-                    transitions[1][0] = Triple(1, 3, 0) // B,0 → write 1, move L, goto A
-                    transitions[1][1] = Triple(1, 7, 1) // B,1 → write 1, move R, goto B
-                    transitions[2][0] = Triple(1, 3, 1) // C,0 → write 1, move L, goto B
-                    transitions[2][1] = Triple(1, 7, 0) // C,1 → write 1, move R, halt
-                    haltFlags[2][1] = true
-                }
-            }
-            "Busy Beaver #4" -> {
-                // 4-state, 2-symbol Busy Beaver (writes 13 ones)
-                if (symbols >= 2) {
-                    transitions[0][0] = Triple(1, 7, 1) // A,0 → 1,R,B
-                    transitions[0][1] = Triple(1, 3, 1) // A,1 → 1,L,B
-                    transitions[1][0] = Triple(1, 3, 0) // B,0 → 1,L,A
-                    transitions[1][1] = Triple(0, 3, 2) // B,1 → 0,L,C
-                    transitions[2][0] = Triple(1, 7, 0) // C,0 → 1,R,halt (actually goes to D in 4-state)
-                    transitions[2][1] = Triple(1, 3, 3) // C,1 → 1,L,D
-                    transitions[3][0] = Triple(1, 7, 3) // D,0 → 1,R,D
-                    transitions[3][1] = Triple(0, 7, 0) // D,1 → 0,R,A
-                    haltFlags[0][1] = false // 4-state BB doesn't halt in simplified form
-                }
-            }
-        }
-    }
-
-    // Mutable state for tracking the tape head across cells in a generation
-    // Using companion object mirrors the original's static fields
+    // Direction constants for readability
     private companion object {
+        const val SE = 0; const val S = 1; const val SW = 2; const val W = 3
+        const val NW = 4; const val N = 5; const val NE = 6; const val E = 7
+
         @Volatile var headMoved = false
         @Volatile var tapeWritten = false
         @Volatile var stateRead = false
@@ -1227,6 +1188,180 @@ class TuringMachine(
         var readSymbol = 0
         var pendingReadSymbol = 0
         var lastGeneration = -1
+
+        val ALL_PROGRAMS = listOf(
+            "Counting", "Subtraction",
+            "Busy Beaver #1", "Busy Beaver #2",
+            "Classic BB-3", "Classic BB-4",
+            "Langton's Ant", "Bouncing Line",
+            "Staircase", "Expanding Square"
+        )
+
+        fun recommendedStates(program: String): Int = when (program) {
+            "Counting", "Subtraction", "Busy Beaver #1", "Busy Beaver #2" -> 4
+            else -> 3
+        }
+    }
+
+    private fun loadProgram(name: String, symbols: Int) {
+        when (name) {
+            // ── Original CAExplorer programs (faithful ports) ──────────────
+
+            "Counting" -> if (symbols >= 3) {
+                // Scans right past digits, increments binary counter, scans back
+                // 2 finite states, 3 symbols
+                transitions[0][0] = Triple(0, E, 0)
+                transitions[0][1] = Triple(1, E, 0)
+                transitions[0][2] = Triple(2, W, 1)  // end of number → turn around
+                transitions[1][0] = Triple(1, E, 0)  // 0 → 1, done incrementing
+                transitions[1][1] = Triple(0, W, 1)  // 1 → 0, carry left
+                transitions[1][2] = Triple(1, E, 0)  // past beginning → write 1
+            }
+
+            "Subtraction" -> if (symbols >= 3) {
+                // Unary subtraction: computes |a - b| for two unary numbers
+                // 10 finite states, 3 symbols — faithfully ported from original Java
+                transitions[0][0] = Triple(0, E, 0)
+                transitions[0][1] = Triple(1, E, 0)
+                transitions[0][2] = Triple(2, E, 1)
+                transitions[1][0] = Triple(0, E, 1)
+                transitions[1][1] = Triple(1, E, 1)
+                transitions[1][2] = Triple(2, W, 2)
+                transitions[2][0] = Triple(0, W, 2)
+                transitions[2][1] = Triple(0, W, 3)
+                transitions[2][2] = Triple(2, E, 5)
+                transitions[3][0] = Triple(0, W, 3)
+                transitions[3][1] = Triple(1, W, 3)
+                transitions[3][2] = Triple(2, W, 8)
+                transitions[4][0] = Triple(0, E, 4)
+                transitions[4][1] = Triple(1, E, 4)
+                transitions[4][2] = Triple(2, E, 5)
+                transitions[5][0] = Triple(0, E, 5)
+                transitions[5][1] = Triple(1, E, 5)
+                transitions[5][2] = Triple(2, W, 6)
+                transitions[6][0] = Triple(2, W, 6)
+                transitions[6][1] = Triple(1, W, 6)
+                transitions[6][2] = Triple(2, W, 7)
+                transitions[7][0] = Triple(0, W, 7)
+                transitions[7][1] = Triple(1, W, 7)
+                transitions[7][2] = Triple(2, E, 9)
+                transitions[8][0] = Triple(0, W, 8)
+                transitions[8][1] = Triple(0, E, 0)
+                transitions[8][2] = Triple(2, E, 4)
+                // State 9: halt state — all transitions halt
+                transitions[9][0] = Triple(0, E, 9)
+                transitions[9][1] = Triple(1, E, 9)
+                transitions[9][2] = Triple(0, E, 9)
+                haltFlags[9][0] = true
+                haltFlags[9][1] = true
+                haltFlags[9][2] = true
+            }
+
+            "Busy Beaver #1" -> if (symbols >= 3) {
+                // Original 3-state halting program (3 symbols)
+                transitions[0][0] = Triple(1, E, 1)
+                transitions[0][1] = Triple(1, E, 0); haltFlags[0][1] = true
+                transitions[0][2] = Triple(1, E, 1)
+                transitions[1][0] = Triple(0, E, 2)
+                transitions[1][1] = Triple(1, E, 1)
+                transitions[1][2] = Triple(0, E, 2)
+                transitions[2][0] = Triple(1, W, 2)
+                transitions[2][1] = Triple(1, W, 0)
+                transitions[2][2] = Triple(1, W, 2)
+            }
+
+            "Busy Beaver #2" -> if (symbols >= 3) {
+                // Original 4-state halting program (3 symbols)
+                transitions[0][0] = Triple(1, E, 1)
+                transitions[0][1] = Triple(1, W, 1)
+                transitions[0][2] = Triple(1, E, 1)
+                transitions[1][0] = Triple(1, W, 0)
+                transitions[1][1] = Triple(0, W, 2)
+                transitions[1][2] = Triple(1, W, 0)
+                transitions[2][0] = Triple(1, W, 2); haltFlags[2][0] = true
+                transitions[2][1] = Triple(1, W, 3)
+                transitions[2][2] = Triple(1, W, 2); haltFlags[2][2] = true
+                transitions[3][0] = Triple(1, E, 3)
+                transitions[3][1] = Triple(0, E, 0)
+                transitions[3][2] = Triple(1, E, 3)
+            }
+
+            // ── Classic Busy Beavers (well-known 2-symbol versions) ───────
+
+            "Classic BB-3" -> if (symbols >= 2) {
+                // 3-state, 2-symbol Busy Beaver — writes 6 ones then halts
+                transitions[0][0] = Triple(1, E, 1) // A,0 → 1,R,B
+                transitions[0][1] = Triple(1, W, 2) // A,1 → 1,L,C
+                transitions[1][0] = Triple(1, W, 0) // B,0 → 1,L,A
+                transitions[1][1] = Triple(1, E, 1) // B,1 → 1,R,B
+                transitions[2][0] = Triple(1, W, 1) // C,0 → 1,L,B
+                transitions[2][1] = Triple(1, E, 0) // C,1 → 1,R,HALT
+                haltFlags[2][1] = true
+            }
+
+            "Classic BB-4" -> if (symbols >= 2) {
+                // 4-state, 2-symbol Busy Beaver — writes 13 ones then halts
+                transitions[0][0] = Triple(1, E, 1) // A,0 → 1,R,B
+                transitions[0][1] = Triple(1, W, 1) // A,1 → 1,L,B
+                transitions[1][0] = Triple(1, W, 0) // B,0 → 1,L,A
+                transitions[1][1] = Triple(0, W, 2) // B,1 → 0,L,C
+                transitions[2][0] = Triple(1, E, 3) // C,0 → 1,R,D
+                transitions[2][1] = Triple(1, W, 3) // C,1 → 1,L,D
+                transitions[3][0] = Triple(1, E, 0) // D,0 → 1,R,A
+                transitions[3][1] = Triple(0, E, 0) // D,1 → 0,R,HALT
+                haltFlags[3][1] = true
+            }
+
+            // ── New 2D programs (exploit Moore neighborhood) ──────────────
+
+            "Langton's Ant" -> if (symbols >= 2) {
+                // Langton's Ant encoded as a TM with 4 heading-tracking states.
+                // On white(0): write black(1), turn right 90°.
+                // On black(1): write white(0), turn left 90°.
+                // Produces the iconic chaotic-then-highway emergent pattern.
+                transitions[0][0] = Triple(1, S, 1)  // heading E, white → black, turn right to S
+                transitions[0][1] = Triple(0, N, 3)  // heading E, black → white, turn left to N
+                transitions[1][0] = Triple(1, W, 2)  // heading S, white → black, turn right to W
+                transitions[1][1] = Triple(0, E, 0)  // heading S, black → white, turn left to E
+                transitions[2][0] = Triple(1, N, 3)  // heading W, white → black, turn right to N
+                transitions[2][1] = Triple(0, S, 1)  // heading W, black → white, turn left to S
+                transitions[3][0] = Triple(1, E, 0)  // heading N, white → black, turn right to E
+                transitions[3][1] = Triple(0, W, 2)  // heading N, black → white, turn left to W
+            }
+
+            "Bouncing Line" -> if (symbols >= 2) {
+                // Head bounces between the two ends of a growing line of 1s.
+                // Each bounce extends the line by one cell. Creates an
+                // ever-expanding horizontal stripe.
+                transitions[0][0] = Triple(1, E, 1) // A,0 → 1,R,B (extend right)
+                transitions[0][1] = Triple(1, W, 0) // A,1 → 1,L,A (scan left)
+                transitions[1][0] = Triple(1, W, 0) // B,0 → 1,L,A (extend left)
+                transitions[1][1] = Triple(1, E, 1) // B,1 → 1,R,B (scan right)
+            }
+
+            "Staircase" -> if (symbols >= 2) {
+                // Alternates East and South moves, drawing a clean diagonal
+                // staircase pattern descending to the SE.
+                transitions[0][0] = Triple(1, E, 1) // step East, switch phase
+                transitions[0][1] = Triple(1, S, 1) // if hit trail, go S
+                transitions[1][0] = Triple(1, S, 0) // step South, switch phase
+                transitions[1][1] = Triple(1, E, 0) // if hit trail, go E
+            }
+
+            "Expanding Square" -> if (symbols >= 2) {
+                // Cycles through E → S → W → N, drawing a square.
+                // When the head hits its own trail, it cuts diagonally to start
+                // a new, larger circuit. Creates an expanding squared-spiral.
+                transitions[0][0] = Triple(1, E, 1) // going E on blank
+                transitions[0][1] = Triple(1, NE, 0) // hit trail → diagonal, restart E
+                transitions[1][0] = Triple(1, S, 2) // going S on blank
+                transitions[1][1] = Triple(1, SE, 1) // hit trail → diagonal
+                transitions[2][0] = Triple(1, W, 3) // going W on blank
+                transitions[2][1] = Triple(1, SW, 2) // hit trail → diagonal
+                transitions[3][0] = Triple(1, N, 0) // going N on blank
+                transitions[3][1] = Triple(1, NW, 3) // hit trail → diagonal
+            }
+        }
     }
 
     override fun nextState(cell: Cell, neighbors: Array<Cell>): CellState {
@@ -1258,20 +1393,19 @@ class TuringMachine(
             return IntegerCellState(cellVal)
         }
 
-        var result = 99 // sentinel: means "not yet determined"
+        var result = 99
 
-        // Try to move the tape head
+        // Move the tape head to this cell (if this cell is the move destination)
         if (!headMoved) {
             val moveDir = transitions[fs][sym].second.coerceIn(0, neighbors.size - 1)
             if (neighbors[moveDir].currentState.toInt() == tapeHead) {
-                // This cell is the destination of the head
                 pendingReadSymbol = cellVal
                 headMoved = true
                 result = tapeHead
             }
         }
 
-        // Try to write on the old head position
+        // Write on the old head position
         if (result == 99 && !tapeWritten) {
             if (cellVal == tapeHead) {
                 tapeWritten = true
@@ -1279,10 +1413,7 @@ class TuringMachine(
             }
         }
 
-        // If neither move nor write applied, keep current value
-        if (result == 99) {
-            result = cellVal
-        }
+        if (result == 99) result = cellVal
 
         return IntegerCellState(result)
     }
@@ -1292,7 +1423,7 @@ class TuringMachine(
     override val properties get() = listOf(
         RuleProperty.ChoiceProperty(
             "program", "Program", programName,
-            listOf("Counting", "Busy Beaver #3", "Busy Beaver #4"),
+            ALL_PROGRAMS,
             "Preset Turing machine program"
         ),
         RuleProperty.IntProperty("numStates", "Symbols + 1", numStates, 3, 8,
@@ -1300,7 +1431,10 @@ class TuringMachine(
     )
 
     override fun withProperty(key: String, value: Any): Rule = when (key) {
-        "program" -> TuringMachine(numStates, value as String)
+        "program" -> {
+            val prog = value as String
+            TuringMachine(recommendedStates(prog), prog)
+        }
         "numStates" -> TuringMachine((value as Number).toInt().coerceIn(3, 8), programName)
         else -> this
     }
