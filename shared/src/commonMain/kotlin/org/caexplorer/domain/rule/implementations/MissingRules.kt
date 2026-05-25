@@ -1162,6 +1162,7 @@ class TuringMachine(
     override val description = "Turing machine on a CA lattice — $programName"
     override val category = RuleCategory.OTHER
     override val compatibleLatticeNames = listOf("Square (Moore)")
+    override val preferredInit = "center_seed"
 
     // Transition table: [finiteState][readSymbol] → Triple(writeSymbol, moveDirection, nextFiniteState)
     // Moore neighbor directions: 0=SE, 1=S, 2=SW, 3=W, 4=NW, 5=N, 6=NE, 7=E

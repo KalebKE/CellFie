@@ -288,6 +288,7 @@ fun MainScreen(
         // Determine density based on init pattern and rule type
         val density = when (initPattern) {
             InitPattern.AUTO -> when {
+                rule.preferredInit == "center_seed" -> 0.0
                 rule is BinaryRule && rule.category == RuleCategory.LIFE_LIKE -> 0.25
                 rule is BinaryRule -> 0.30
                 rule is IntegerRule && numStates > 2 -> 0.50
@@ -305,7 +306,8 @@ fun MainScreen(
             InitPattern.DIAGONAL -> 0.0
         }
 
-        val useCenter = initPattern == InitPattern.CENTER_SEED
+        val useCenter = initPattern == InitPattern.CENTER_SEED ||
+            (initPattern == InitPattern.AUTO && rule.preferredInit == "center_seed")
         val useGradient = initPattern == InitPattern.GRADIENT
         val isRealRule = rule is RealRule
         val useRandomReals = isRealRule && !useGradient

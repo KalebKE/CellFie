@@ -64,6 +64,14 @@ interface Rule {
     /** Configurable properties for this rule. Empty list means no configuration. */
     val properties: List<RuleProperty> get() = emptyList()
 
+    /**
+     * Hint for the AUTO initialisation pattern.
+     * Return "center_seed" for rules that need a single active cell in the center
+     * (e.g. Turing Machine, Langton's Ant, elementary rules).
+     * Return "random" (default) for rules that work best with random initial states.
+     */
+    val preferredInit: String get() = "random"
+
     /** Update a property value. Returns a new Rule instance with the updated value, or this if unchanged. */
     fun withProperty(key: String, value: Any): Rule = this
 }

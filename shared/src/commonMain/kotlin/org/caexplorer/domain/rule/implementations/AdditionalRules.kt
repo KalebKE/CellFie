@@ -42,6 +42,7 @@ class LangtonsAnt : IntegerRule() {
     override val description = "Turing-complete ant that produces emergent highways"
     override val category = RuleCategory.OTHER
     override val compatibleLatticeNames = listOf("Square (Von Neumann)")
+    override val preferredInit = "center_seed"
 
     override fun nextState(cell: Cell, neighbors: Array<Cell>): CellState {
         val state = cell.currentState.toInt()
