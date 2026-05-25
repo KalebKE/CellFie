@@ -119,4 +119,83 @@ class RuleTest {
         val all = org.caexplorer.domain.rule.RuleRegistry.getAll()
         assertTrue(all.size > 256, "Expected 256+ total rules, got ${all.size}")
     }
+
+    /**
+     * Test that Turing Machine "Bouncing Line" moves the head correctly.
+     * The head should alternate E and W, extending a line of 1s.
+     */
+    @Test
+    fun turingMachineBouncingLine() {
+        val tm = TuringMachine(numStates = 3, programName = "Bouncing Line")
+        val size = 11
+        val center = size / 2
+        val tapeHead = 2 // numStates - 1
+
+        val lattice = createGrid(size, size) { coord ->
+            if (coord.row == center && coord.col == center) tapeHead else 0
+        }
+
+        // Simulate 4 steps, processing all cells in order (like engine)
+        repeat(4) {
+            val newStates = mutableMapOf<Cell, IntegerCellState>()
+            for (cell in lattice.cells) {
+                val neighbors = lattice.getNeighbors(cell)
+                newStates[cell] = tm.nextState(cell, neighbors) as IntegerCellState
+            }
+            for ((cell, state) in newStates) {
+                cell.addNewState(state)
+            }
+        }
+
+        // After 4 steps, the head should have moved and left 1s behind
+        // Verify the head exists somewhere on the center row
+        var headCount = 0
+        var oneCount = 0
+        for (col in 0 until size) {
+            val cell = lattice.getCell(center, col)!!
+            val state = cell.currentState.toInt()
+            if (state == tapeHead) headCount++
+            if (state == 1) oneCount++
+        }
+        assertEquals(1, headCount, "Should have exactly one tape head")
+        assertTrue(oneCount > 0, "Should have written at least one '1' on the tape")
+    }
+
+    /**
+     * Test Turing Machine works even when cells are processed in REVERSE order
+     * (simulates worst-case in-place update scenario).
+     */
+    @Test
+    fun turingMachineReverseProcessingOrder() {
+        val tm = TuringMachine(numStates = 3, programName = "Bouncing Line")
+        val size = 11
+        val center = size / 2
+        val tapeHead = 2
+
+        val lattice = createGrid(size, size) { coord ->
+            if (coord.row == center && coord.col == center) tapeHead else 0
+        }
+
+        // Simulate 4 steps, processing cells in REVERSE order
+        repeat(4) {
+            val reversedCells = lattice.cells.reversed()
+            for (cell in reversedCells) {
+                val neighbors = lattice.getNeighbors(cell)
+                val newState = tm.nextState(cell, neighbors)
+                cell.addNewState(newState)
+            }
+        }
+
+        // Should still work correctly
+        var headCount = 0
+        var oneCount = 0
+        for (col in 0 until size) {
+            val cell = lattice.getCell(center, col)!!
+            val state = cell.currentState.toInt()
+            if (state == tapeHead) headCount++
+            if (state == 1) oneCount++
+        }
+        assertEquals(1, headCount, "Should have exactly one tape head (reverse order)")
+        assertTrue(oneCount > 0, "Should have written 1s on the tape (reverse order)")
+    }
 }

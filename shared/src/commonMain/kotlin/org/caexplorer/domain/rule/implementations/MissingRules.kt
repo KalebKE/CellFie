@@ -1144,13 +1144,19 @@ class ChainLinkFence(override val numStates: Int = 10) : IntegerRule() {
 /**
  * Turing Machine implemented as a cellular automaton.
  *
- * The lattice is the infinite tape. Cell states are the tape symbols.
- * The highest state (numStates - 1) is the tape head marker.
- * A finite-state controller reads the symbol under the head,
- * writes a new symbol, moves the head, and transitions to a new state.
+ * The lattice is the tape. Cell states 0..(numStates-2) are tape symbols.
+ * State (numStates-1) is the tape head marker.
  *
- * Includes original preset programs (Counting, Subtraction, Busy Beaver #1/#2),
- * classic Busy Beavers, and 2D programs that exploit the Moore neighborhood.
+ * A finite-state controller is tracked externally. Each generation:
+ * 1. The head cell writes a new symbol (replaces head marker with write value)
+ * 2. The cell in the move direction becomes the new head
+ * 3. The finite state transitions based on the read symbol
+ *
+ * Each cell's nextState is purely local: it checks whether it IS the old head
+ * (write the tape symbol) or whether the head is an adjacent neighbor that
+ * wants to move HERE (become the new head). All other cells stay unchanged.
+ *
+ * MP lattice Moore neighbor order: 0=NW, 1=N, 2=NE, 3=E, 4=SE, 5=S, 6=SW, 7=W
  *
  * Port of Java TuringMachine.java by Kaleb Kircher, extended with new programs.
  */
@@ -1164,38 +1170,52 @@ class TuringMachine(
     override val compatibleLatticeNames = listOf("Square (Moore)")
     override val preferredInit = "center_seed"
 
-    // Transition table: [finiteState][readSymbol] → Triple(writeSymbol, moveDirection, nextFiniteState)
-    // Moore neighbor directions: 0=SE, 1=S, 2=SW, 3=W, 4=NW, 5=N, 6=NE, 7=E
+    // Transition table: [finiteState][readSymbol] → (writeSymbol, moveDirIndex, nextFiniteState)
+    // moveDirIndex uses MP ordering: 0=NW, 1=N, 2=NE, 3=E, 4=SE, 5=S, 6=SW, 7=W
     private val transitions: Array<Array<Triple<Int, Int, Int>>>
     private val haltFlags: Array<BooleanArray>
 
     init {
         val symbols = numStates - 1
         val numFiniteStates = 20
-        transitions = Array(numFiniteStates) { Array(symbols) { Triple(0, 7, 0) } }
+        transitions = Array(numFiniteStates) { Array(symbols) { Triple(0, 3, 0) } }
         haltFlags = Array(numFiniteStates) { BooleanArray(symbols) }
         loadProgram(programName, symbols)
     }
 
-    // Direction constants for readability
+    // MP lattice Moore neighbor indices
     private companion object {
-        const val SE = 0; const val S = 1; const val SW = 2; const val W = 3
-        const val NW = 4; const val N = 5; const val NE = 6; const val E = 7
+        // MP ordering: 0=NW, 1=N, 2=NE, 3=E, 4=SE, 5=S, 6=SW, 7=W
+        const val NW = 0; const val N = 1; const val NE = 2; const val E = 3
+        const val SE = 4; const val S = 5; const val SW = 6; const val W = 7
 
-        @Volatile var headMoved = false
-        @Volatile var tapeWritten = false
-        @Volatile var stateRead = false
-        var currentFiniteState = 0
-        var readSymbol = 0
-        var pendingReadSymbol = 0
-        var lastGeneration = -1
+        // Opposite direction lookup: if head moves East (3), the destination
+        // cell finds the head by looking West (7), its opposite direction.
+        val OPPOSITE = intArrayOf(
+            SE, // opposite of NW(0) is SE(4)
+            S,  // opposite of N(1) is S(5)
+            SW, // opposite of NE(2) is SW(6)
+            W,  // opposite of E(3) is W(7)
+            NW, // opposite of SE(4) is NW(0)
+            N,  // opposite of S(5) is N(1)
+            NE, // opposite of SW(6) is NE(2)
+            E,  // opposite of W(7) is E(3)
+        )
+
+        // Global TM controller state — updated once per generation
+        @Volatile var currentFiniteState = 0
+        @Volatile var readSymbol = 0
+        @Volatile var halted = false
+        @Volatile var lastGeneration = -1
+        @Volatile var pendingNextState = 0
+        @Volatile var pendingReadSymbol = 0
+        @Volatile var stateUpdated = false
 
         val ALL_PROGRAMS = listOf(
             "Counting", "Subtraction",
             "Busy Beaver #1", "Busy Beaver #2",
             "Classic BB-3", "Classic BB-4",
-            "Langton's Ant", "Bouncing Line",
-            "Staircase", "Expanding Square"
+            "Bouncing Line", "Staircase", "Expanding Square"
         )
 
         fun recommendedStates(program: String): Int = when (program) {
@@ -1205,23 +1225,26 @@ class TuringMachine(
     }
 
     private fun loadProgram(name: String, symbols: Int) {
+        // Reset controller on program load
+        currentFiniteState = 0
+        readSymbol = 0
+        halted = false
+        lastGeneration = -1
+        stateUpdated = false
+
         when (name) {
-            // ── Original CAExplorer programs (faithful ports) ──────────────
+            // ── Original CAExplorer programs (3-symbol) ───────────────────
 
             "Counting" -> if (symbols >= 3) {
-                // Scans right past digits, increments binary counter, scans back
-                // 2 finite states, 3 symbols
                 transitions[0][0] = Triple(0, E, 0)
                 transitions[0][1] = Triple(1, E, 0)
-                transitions[0][2] = Triple(2, W, 1)  // end of number → turn around
-                transitions[1][0] = Triple(1, E, 0)  // 0 → 1, done incrementing
-                transitions[1][1] = Triple(0, W, 1)  // 1 → 0, carry left
-                transitions[1][2] = Triple(1, E, 0)  // past beginning → write 1
+                transitions[0][2] = Triple(2, W, 1)
+                transitions[1][0] = Triple(1, E, 0)
+                transitions[1][1] = Triple(0, W, 1)
+                transitions[1][2] = Triple(1, E, 0)
             }
 
             "Subtraction" -> if (symbols >= 3) {
-                // Unary subtraction: computes |a - b| for two unary numbers
-                // 10 finite states, 3 symbols — faithfully ported from original Java
                 transitions[0][0] = Triple(0, E, 0)
                 transitions[0][1] = Triple(1, E, 0)
                 transitions[0][2] = Triple(2, E, 1)
@@ -1249,17 +1272,12 @@ class TuringMachine(
                 transitions[8][0] = Triple(0, W, 8)
                 transitions[8][1] = Triple(0, E, 0)
                 transitions[8][2] = Triple(2, E, 4)
-                // State 9: halt state — all transitions halt
-                transitions[9][0] = Triple(0, E, 9)
-                transitions[9][1] = Triple(1, E, 9)
-                transitions[9][2] = Triple(0, E, 9)
-                haltFlags[9][0] = true
-                haltFlags[9][1] = true
-                haltFlags[9][2] = true
+                transitions[9][0] = Triple(0, E, 9); haltFlags[9][0] = true
+                transitions[9][1] = Triple(1, E, 9); haltFlags[9][1] = true
+                transitions[9][2] = Triple(0, E, 9); haltFlags[9][2] = true
             }
 
             "Busy Beaver #1" -> if (symbols >= 3) {
-                // Original 3-state halting program (3 symbols)
                 transitions[0][0] = Triple(1, E, 1)
                 transitions[0][1] = Triple(1, E, 0); haltFlags[0][1] = true
                 transitions[0][2] = Triple(1, E, 1)
@@ -1272,7 +1290,6 @@ class TuringMachine(
             }
 
             "Busy Beaver #2" -> if (symbols >= 3) {
-                // Original 4-state halting program (3 symbols)
                 transitions[0][0] = Triple(1, E, 1)
                 transitions[0][1] = Triple(1, W, 1)
                 transitions[0][2] = Triple(1, E, 1)
@@ -1287,80 +1304,53 @@ class TuringMachine(
                 transitions[3][2] = Triple(1, E, 3)
             }
 
-            // ── Classic Busy Beavers (well-known 2-symbol versions) ───────
+            // ── Classic 2-symbol Busy Beavers ─────────────────────────────
 
             "Classic BB-3" -> if (symbols >= 2) {
-                // 3-state, 2-symbol Busy Beaver — writes 6 ones then halts
-                transitions[0][0] = Triple(1, E, 1) // A,0 → 1,R,B
-                transitions[0][1] = Triple(1, W, 2) // A,1 → 1,L,C
-                transitions[1][0] = Triple(1, W, 0) // B,0 → 1,L,A
-                transitions[1][1] = Triple(1, E, 1) // B,1 → 1,R,B
-                transitions[2][0] = Triple(1, W, 1) // C,0 → 1,L,B
-                transitions[2][1] = Triple(1, E, 0) // C,1 → 1,R,HALT
-                haltFlags[2][1] = true
+                transitions[0][0] = Triple(1, E, 1)
+                transitions[0][1] = Triple(1, W, 2)
+                transitions[1][0] = Triple(1, W, 0)
+                transitions[1][1] = Triple(1, E, 1)
+                transitions[2][0] = Triple(1, W, 1)
+                transitions[2][1] = Triple(1, E, 0); haltFlags[2][1] = true
             }
 
             "Classic BB-4" -> if (symbols >= 2) {
-                // 4-state, 2-symbol Busy Beaver — writes 13 ones then halts
-                transitions[0][0] = Triple(1, E, 1) // A,0 → 1,R,B
-                transitions[0][1] = Triple(1, W, 1) // A,1 → 1,L,B
-                transitions[1][0] = Triple(1, W, 0) // B,0 → 1,L,A
-                transitions[1][1] = Triple(0, W, 2) // B,1 → 0,L,C
-                transitions[2][0] = Triple(1, E, 3) // C,0 → 1,R,D
-                transitions[2][1] = Triple(1, W, 3) // C,1 → 1,L,D
-                transitions[3][0] = Triple(1, E, 0) // D,0 → 1,R,A
-                transitions[3][1] = Triple(0, E, 0) // D,1 → 0,R,HALT
-                haltFlags[3][1] = true
+                transitions[0][0] = Triple(1, E, 1)
+                transitions[0][1] = Triple(1, W, 1)
+                transitions[1][0] = Triple(1, W, 0)
+                transitions[1][1] = Triple(0, W, 2)
+                transitions[2][0] = Triple(1, E, 3)
+                transitions[2][1] = Triple(1, W, 3)
+                transitions[3][0] = Triple(1, E, 0)
+                transitions[3][1] = Triple(0, E, 0); haltFlags[3][1] = true
             }
 
-            // ── New 2D programs (exploit Moore neighborhood) ──────────────
-
-            "Langton's Ant" -> if (symbols >= 2) {
-                // Langton's Ant encoded as a TM with 4 heading-tracking states.
-                // On white(0): write black(1), turn right 90°.
-                // On black(1): write white(0), turn left 90°.
-                // Produces the iconic chaotic-then-highway emergent pattern.
-                transitions[0][0] = Triple(1, S, 1)  // heading E, white → black, turn right to S
-                transitions[0][1] = Triple(0, N, 3)  // heading E, black → white, turn left to N
-                transitions[1][0] = Triple(1, W, 2)  // heading S, white → black, turn right to W
-                transitions[1][1] = Triple(0, E, 0)  // heading S, black → white, turn left to E
-                transitions[2][0] = Triple(1, N, 3)  // heading W, white → black, turn right to N
-                transitions[2][1] = Triple(0, S, 1)  // heading W, black → white, turn left to S
-                transitions[3][0] = Triple(1, E, 0)  // heading N, white → black, turn right to E
-                transitions[3][1] = Triple(0, W, 2)  // heading N, black → white, turn left to W
-            }
+            // ── 2D programs ───────────────────────────────────────────────
 
             "Bouncing Line" -> if (symbols >= 2) {
-                // Head bounces between the two ends of a growing line of 1s.
-                // Each bounce extends the line by one cell. Creates an
-                // ever-expanding horizontal stripe.
-                transitions[0][0] = Triple(1, E, 1) // A,0 → 1,R,B (extend right)
-                transitions[0][1] = Triple(1, W, 0) // A,1 → 1,L,A (scan left)
-                transitions[1][0] = Triple(1, W, 0) // B,0 → 1,L,A (extend left)
-                transitions[1][1] = Triple(1, E, 1) // B,1 → 1,R,B (scan right)
+                transitions[0][0] = Triple(1, E, 1)
+                transitions[0][1] = Triple(1, W, 0)
+                transitions[1][0] = Triple(1, W, 0)
+                transitions[1][1] = Triple(1, E, 1)
             }
 
             "Staircase" -> if (symbols >= 2) {
-                // Alternates East and South moves, drawing a clean diagonal
-                // staircase pattern descending to the SE.
-                transitions[0][0] = Triple(1, E, 1) // step East, switch phase
-                transitions[0][1] = Triple(1, S, 1) // if hit trail, go S
-                transitions[1][0] = Triple(1, S, 0) // step South, switch phase
-                transitions[1][1] = Triple(1, E, 0) // if hit trail, go E
+                transitions[0][0] = Triple(1, E, 1)
+                transitions[0][1] = Triple(1, S, 1)
+                transitions[1][0] = Triple(1, S, 0)
+                transitions[1][1] = Triple(1, E, 0)
             }
 
             "Expanding Square" -> if (symbols >= 2) {
-                // Cycles through E → S → W → N, drawing a square.
-                // When the head hits its own trail, it cuts diagonally to start
-                // a new, larger circuit. Creates an expanding squared-spiral.
-                transitions[0][0] = Triple(1, E, 1) // going E on blank
-                transitions[0][1] = Triple(1, NE, 0) // hit trail → diagonal, restart E
-                transitions[1][0] = Triple(1, S, 2) // going S on blank
-                transitions[1][1] = Triple(1, SE, 1) // hit trail → diagonal
-                transitions[2][0] = Triple(1, W, 3) // going W on blank
-                transitions[2][1] = Triple(1, SW, 2) // hit trail → diagonal
-                transitions[3][0] = Triple(1, N, 0) // going N on blank
-                transitions[3][1] = Triple(1, NW, 3) // hit trail → diagonal
+                transitions[0][0] = Triple(1, E, 1)
+                transitions[0][1] = Triple(1, NE, 0)
+                transitions[1][0] = Triple(1, S, 2)
+                transitions[1][1] = Triple(1, SE, 1)
+                transitions[2][0] = Triple(1, W, 3)
+                transitions[2][1] = Triple(1, SW, 2)
+                transitions[3][0] = Triple(1, N, 0)
+                transitions[3][1] = Triple(1, NW, 3)
             }
         }
     }
@@ -1370,53 +1360,71 @@ class TuringMachine(
         val cellVal = cell.currentState.toInt()
         val generation = cell.generation
 
-        // Reset per-generation flags
+        // Once per generation: advance the finite state controller
         if (lastGeneration != generation) {
             lastGeneration = generation
-            headMoved = false
-            tapeWritten = false
-            stateRead = false
-            readSymbol = pendingReadSymbol
+            if (stateUpdated) {
+                currentFiniteState = pendingNextState
+                readSymbol = pendingReadSymbol
+            }
+            stateUpdated = false
         }
 
-        // Update finite state after both write and move are done
-        if (!stateRead && tapeWritten && headMoved) {
-            stateRead = true
-            val sym = readSymbol.coerceIn(0, numStates - 2)
-            val fs = currentFiniteState.coerceIn(0, transitions.size - 1)
-            currentFiniteState = transitions[fs][sym].third
-        }
-
-        // Check halt
+        // If halted, everything freezes
         val fs = currentFiniteState.coerceIn(0, transitions.size - 1)
         val sym = readSymbol.coerceIn(0, numStates - 2)
         if (haltFlags[fs][sym]) {
             return IntegerCellState(cellVal)
         }
 
-        var result = 99
+        val transition = transitions[fs][sym]
+        val writeVal = transition.first.coerceIn(0, numStates - 2)
+        val moveDir = transition.second.coerceIn(0, 7)
+        val nextFS = transition.third
 
-        // Move the tape head to this cell (if this cell is the move destination)
-        if (!headMoved) {
-            val moveDir = transitions[fs][sym].second.coerceIn(0, neighbors.size - 1)
-            if (neighbors[moveDir].currentState.toInt() == tapeHead) {
-                pendingReadSymbol = cellVal
-                headMoved = true
-                result = tapeHead
+        // Case 1: This cell IS the tape head → it gets written over
+        if (cellVal == tapeHead) {
+            return IntegerCellState(writeVal)
+        }
+
+        // Case 2: This cell is the move DESTINATION.
+        // The head wants to move in direction `moveDir`. From THIS cell's
+        // perspective, the head is in the OPPOSITE direction.
+        // Use getOldNeighborState to handle in-place updates: if the head cell
+        // was already processed this generation (state changed to writeVal),
+        // we check its previousState instead.
+        val oppositeDir = OPPOSITE[moveDir]
+        if (oppositeDir < neighbors.size) {
+            val neighbor = neighbors[oppositeDir]
+            val neighborState = getOldNeighborState(neighbor, generation)
+            if (neighborState == tapeHead) {
+                if (!stateUpdated) {
+                    stateUpdated = true
+                    pendingReadSymbol = cellVal
+                    pendingNextState = nextFS
+                }
+                return IntegerCellState(tapeHead)
             }
         }
 
-        // Write on the old head position
-        if (result == 99 && !tapeWritten) {
-            if (cellVal == tapeHead) {
-                tapeWritten = true
-                result = transitions[fs][sym].first.coerceIn(0, numStates - 2)
-            }
+        // Case 3: Not involved → stay the same
+        return IntegerCellState(cellVal)
+    }
+
+    /**
+     * Get a neighbor's state from BEFORE this generation's updates.
+     * If the neighbor has already been processed (generation incremented),
+     * use its previousState to see what it was before the update.
+     */
+    private fun getOldNeighborState(neighbor: Cell, myGeneration: Int): Int {
+        return if (neighbor.generation > myGeneration) {
+            // Neighbor already processed this step — its currentState is the
+            // NEW state. Use previousState to get the pre-update value.
+            neighbor.previousState?.toInt() ?: neighbor.currentState.toInt()
+        } else {
+            // Neighbor not yet processed — currentState is still the old value.
+            neighbor.currentState.toInt()
         }
-
-        if (result == 99) result = cellVal
-
-        return IntegerCellState(result)
     }
 
     override fun createInitialState(): CellState = IntegerCellState(0)
