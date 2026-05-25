@@ -48,6 +48,7 @@ object RuleRegistry {
         register(MajorityVote(numStates = 2))
         register(MajorityVote(numStates = 3))
         register(NeuralNetCA())
+        register(NeuralNet())
         register(GrowingSeed())
         register(LavaLamp())
         register(Anneal())
@@ -113,6 +114,29 @@ object RuleRegistry {
         register(LangtonLambda())
         register(PrimeDeath())
         register(PrimePlague())
+
+        // Missing rules ported from original Java CAExplorer
+        register(Julia())
+        register(HexLife())
+        register(TriLife())
+        register(ComplexLife())
+        register(ComplexContinuousCA())
+        register(AlternateContinuousCA())
+        register(ReversibleRuleNumber(90))
+        register(MajorityWins())
+        register(MinorityWins())
+        register(MajorityProbablyWins())
+        register(PistonPrime())
+        register(House())
+        register(ChutesLaddersAndShifts())
+        register(CoolClassIV())
+        register(PrettyClassIV())
+        register(SatansStaircase())
+        // TuringMachine skipped: 1733-line Java rule with GUI-dependent global state,
+        // not portable to pure Rule interface. LangtonsAnt already provides a 2D Turing machine.
+        register(CellularMarketModel())
+        register(RealSort())
+        register(ChainLinkFence())
     }
 
     fun register(rule: Rule) {
