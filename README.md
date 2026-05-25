@@ -13,25 +13,6 @@ Over 300 rules across 14 categories — from Wolfram elementary automata to Turi
 
 ---
 
-## Screenshots
-
-<p align="center">
-  <img src="screenshots/rule_30.png" width="280" alt="Rule 30">&nbsp;&nbsp;
-  <img src="screenshots/rule_90.png" width="280" alt="Rule 90">&nbsp;&nbsp;
-  <img src="screenshots/rule_110.png" width="280" alt="Rule 110">
-</p>
-
-<p align="center">
-  <img src="screenshots/game_of_life.png" width="280" alt="Game of Life">&nbsp;&nbsp;
-  <img src="screenshots/langtons_ant.png" width="280" alt="Langton's Ant">&nbsp;&nbsp;
-  <img src="screenshots/brians_brain.png" width="280" alt="Brian's Brain">
-</p>
-
-<p align="center">
-  <img src="screenshots/cyclic_ca.png" width="400" alt="Cyclic CA">&nbsp;&nbsp;
-  <img src="screenshots/screenshot-2026-05-25-11-11-02.png" width="400" alt="Lenia Growth">
-</p>
-
 ---
 
 ## What Is a Cellular Automaton?
@@ -204,6 +185,11 @@ Neural-network-inspired cellular automata, where cells behave like artificial ne
 - **Neural Net** — Each cell computes a sigmoid activation function: `σ(gain × (weighted_sum - threshold))`. With 8 states, this produces oscillating wave-like patterns reminiscent of brain activity.
 
 - **NeuralNet CA (Lenia)** — Inspired by Bert Chan's [Lenia](https://arxiv.org/abs/1812.05433), this uses a continuous growth function with a bell curve kernel. Produces remarkably organic, self-organizing lifeforms — blobs that move, pulsate, and interact like actual organisms.
+
+<p align="center">
+  <img src="screenshots/screenshot-2026-05-25-11-11-02.png" width="600" alt="Lenia Growth">
+</p>
+<p align="center"><em>Lenia Growth — organic blobs and pulsating lifeforms</em></p>
 
 ### Social
 
