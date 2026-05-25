@@ -1230,6 +1230,7 @@ class TuringMachine(
         val ALL_PROGRAMS = listOf(
             "Counting", "Bouncing Line", "Staircase", "Expanding Square",
             "Binary Counter", "Busy Beaver",
+            "Zigzag", "Spiral",
             "Subtraction"
         )
 
@@ -1295,9 +1296,9 @@ class TuringMachine(
                 transitions[8][0] = Triple(0, W, 8)
                 transitions[8][1] = Triple(0, E, 0)
                 transitions[8][2] = Triple(2, E, 4)
-                transitions[9][0] = Triple(0, E, HALT)
-                transitions[9][1] = Triple(1, E, HALT)
-                transitions[9][2] = Triple(0, E, HALT)
+                transitions[9][0] = Triple(0, E, 9); haltFlags[9][0] = true
+                transitions[9][1] = Triple(1, E, 9); haltFlags[9][1] = true
+                transitions[9][2] = Triple(0, E, 9); haltFlags[9][2] = true
             }
 
             // ── Classic 2-symbol Busy Beavers (champion machines) ─────────
@@ -1387,20 +1388,32 @@ class TuringMachine(
 
             "Binary Counter" -> if (symbols >= 2) {
                 // Non-halting binary counter: increments forever.
-                // Scans right to find end, turns around, flips 1→0 (carry),
-                // 0→1 (done), scans right again. Wraps at grid boundary.
-                transitions[0][0] = Triple(0, E, 0) // scan right past 0s
-                transitions[0][1] = Triple(1, E, 0) // scan right past 1s
-                // When head wraps around (reads 0 after rightmost 1), we rely
-                // on the fact that the head enters blank tape and turns around.
-                // This uses 3 states for a cleaner loop:
-                // State 0: scan right. When we see the leftmost 0 after 1s, turn.
-                // State 1: increment mode, go left.
-                // State 2: scan right to re-enter state 0.
-                // For 2-symbol tape, a simpler approach:
-                // State 0 scans E; when cell after all marks is blank, switch.
-                transitions[1][0] = Triple(1, W, 0) // carry done: write 1, go right
-                transitions[1][1] = Triple(0, W, 1) // carry: 1→0, keep going left
+                transitions[0][0] = Triple(0, E, 0)
+                transitions[0][1] = Triple(1, E, 0)
+                transitions[1][0] = Triple(1, W, 0)
+                transitions[1][1] = Triple(0, W, 1)
+            }
+
+            // ── Additional 2D programs ────────────────────────────────────
+
+            "Zigzag" -> if (symbols >= 2) {
+                // Alternates between moving E and SE, creating a zigzag trail
+                transitions[0][0] = Triple(1, E, 1)
+                transitions[0][1] = Triple(1, W, 1)
+                transitions[1][0] = Triple(1, SE, 0)
+                transitions[1][1] = Triple(1, NW, 0)
+            }
+
+            "Spiral" -> if (symbols >= 2) {
+                // Turns left when hitting a mark, creating an expanding spiral
+                transitions[0][0] = Triple(1, E, 1)   // blank → mark, go E, state 1
+                transitions[0][1] = Triple(1, N, 0)   // mark → mark, turn left (N), state 0
+                transitions[1][0] = Triple(1, S, 2)   // blank → mark, go S, state 2
+                transitions[1][1] = Triple(1, E, 1)   // mark → keep E, state 1
+                transitions[2][0] = Triple(1, W, 3)   // blank → mark, go W, state 3
+                transitions[2][1] = Triple(1, S, 2)   // mark → keep S, state 2
+                transitions[3][0] = Triple(1, N, 0)   // blank → mark, go N, state 0
+                transitions[3][1] = Triple(1, W, 3)   // mark → keep W, state 3
             }
         }
     }

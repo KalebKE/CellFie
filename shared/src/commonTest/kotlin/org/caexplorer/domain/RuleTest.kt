@@ -337,4 +337,97 @@ class RuleTest {
         assertEquals(13, oneCount,
             "BB-4 should produce 13 ones on tape, but got $oneCount")
     }
+
+    /**
+     * Test BB-3 with in-place updates (like the real engine) to verify
+     * getOldNeighborState handles this correctly.
+     */
+    @Test
+    fun turingMachineBB3InPlace() {
+        val tm = TuringMachine(numStates = 3, programName = "Busy Beaver", bbStates = 3)
+        val size = 21
+        val center = size / 2
+        val tapeHead = 2
+
+        val lattice = createGrid(size, size) { coord ->
+            if (coord.row == center && coord.col == center) tapeHead else 0
+        }
+
+        var stepsWithChange = 0
+        for (step in 0 until 100) {
+            var changed = false
+            // In-place: nextState + addNewState per cell, like the real engine
+            for (cell in lattice.cells) {
+                val neighbors = lattice.getNeighbors(cell)
+                val newState = tm.nextState(cell, neighbors) as IntegerCellState
+                if (cell.currentState.toInt() != newState.toInt()) changed = true
+                cell.addNewState(newState)
+            }
+            if (changed) stepsWithChange++
+            else break
+        }
+
+        assertTrue(stepsWithChange >= 5,
+            "BB-3 in-place should run for multiple steps, but only ran $stepsWithChange")
+
+        var oneCount = 0
+        var headCount = 0
+        for (col in 0 until size) {
+            val cell = lattice.getCell(center, col)!!
+            val s = cell.currentState.toInt()
+            if (s == 1) oneCount++
+            if (s == tapeHead) headCount++
+        }
+        assertEquals(1, headCount, "Should have exactly one head marker (in-place)")
+        assertTrue(oneCount >= 5,
+            "BB-3 in-place should produce at least 5 visible ones, but got $oneCount")
+    }
+
+    /**
+     * Verify that changing bbStates produces different halt step counts.
+     */
+    @Test
+    fun turingMachineBBStatesAffectBehavior() {
+        val results = mutableMapOf<Int, Int>()
+        for (bb in 1..4) {
+            val tm = TuringMachine(numStates = 3, programName = "Busy Beaver", bbStates = bb)
+            val size = if (bb <= 3) 21 else 51
+            val center = size / 2
+            val tapeHead = 2
+
+            val lattice = createGrid(size, size) { coord ->
+                if (coord.row == center && coord.col == center) tapeHead else 0
+            }
+
+            var steps = 0
+            for (step in 0 until 200) {
+                val newStates = mutableMapOf<Cell, IntegerCellState>()
+                for (cell in lattice.cells) {
+                    val neighbors = lattice.getNeighbors(cell)
+                    newStates[cell] = tm.nextState(cell, neighbors) as IntegerCellState
+                }
+                var changed = false
+                for ((cell, state) in newStates) {
+                    if (cell.currentState.toInt() != state.toInt()) changed = true
+                    cell.addNewState(state)
+                }
+                if (changed) steps++
+                else break
+            }
+            results[bb] = steps
+        }
+
+        // Each BB(n) should halt at a different step count
+        val uniqueSteps = results.values.toSet()
+        assertEquals(4, uniqueSteps.size,
+            "BB(1-4) should all halt at different step counts, but got: $results")
+
+        // Verify monotonic increase: BB(1) < BB(2) < BB(3) < BB(4)
+        assertTrue(results[1]!! < results[2]!!,
+            "BB(1) should halt before BB(2): ${results[1]} vs ${results[2]}")
+        assertTrue(results[2]!! < results[3]!!,
+            "BB(2) should halt before BB(3): ${results[2]} vs ${results[3]}")
+        assertTrue(results[3]!! < results[4]!!,
+            "BB(3) should halt before BB(4): ${results[3]} vs ${results[4]}")
+    }
 }
