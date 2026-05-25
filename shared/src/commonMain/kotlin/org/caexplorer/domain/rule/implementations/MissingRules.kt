@@ -1362,11 +1362,16 @@ class TuringMachine(
 
         // Once per generation: advance the finite state controller
         if (lastGeneration != generation) {
-            lastGeneration = generation
-            if (stateUpdated) {
+            if (generation < lastGeneration) {
+                // Simulation was restarted — reset controller to initial state
+                currentFiniteState = 0
+                readSymbol = 0
+                stateUpdated = false
+            } else if (stateUpdated) {
                 currentFiniteState = pendingNextState
                 readSymbol = pendingReadSymbol
             }
+            lastGeneration = generation
             stateUpdated = false
         }
 
